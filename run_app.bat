@@ -1,0 +1,3 @@
+@echo off
+echo Iniciando Compromiso Real Dashboard...
+cmd /k "python -m streamlit run app.py"
