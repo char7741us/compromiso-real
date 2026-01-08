@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { useVoters } from '../../context/VoterContext';
 import { BarChart3, TrendingUp, AlertCircle, CheckCircle } from 'lucide-react';
+import AdminHeader from '../../components/AdminHeader';
+import SkeletonLoader from '../../components/SkeletonLoader';
 
 interface LeaderStats {
     name: string;
@@ -11,7 +13,7 @@ interface LeaderStats {
 }
 
 export default function AnalysisPage() {
-    const { voters } = useVoters();
+    const { voters, isLoading } = useVoters();
 
     // Compute leader stats
     const leaderData = useMemo(() => {
@@ -38,54 +40,52 @@ export default function AnalysisPage() {
             if (v['PUESTO DE VOTACIÓN']?.trim()) stats.withVotingPost++;
         });
 
-        // Convert to array and sort by voter count (desc)
         return Array.from(statsMap.values()).sort((a, b) => b.voterCount - a.voterCount);
     }, [voters]);
 
     const totalVoters = voters.length;
-
-    // Top 5 Leaders for chart
     const topLeaders = leaderData.slice(0, 5);
     const maxVotes = topLeaders[0]?.voterCount || 1;
 
+    if (isLoading && voters.length === 0) {
+        return (
+            <div style={{ padding: '20px' }}>
+                <SkeletonLoader type="text" count={2} />
+                <SkeletonLoader type="kpi" count={2} />
+                <SkeletonLoader type="card" count={1} />
+                <SkeletonLoader type="table" count={5} />
+            </div>
+        );
+    }
+
     return (
         <div>
-            <div className="import-page-header">
-                <h2 className="import-page-title">Análisis de Líderes y Cumplimiento</h2>
-                <p className="import-description">
-                    Detalle de rendimiento por estructura y calidad de datos.
-                </p>
-            </div>
+            <AdminHeader
+                title="Análisis de Líderes y Cumplimiento"
+                description="Detalle de rendimiento por estructura y calidad de datos."
+            />
 
             {/* TOP METRICS */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '30px' }}>
-                <div className="card" style={{ padding: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                        <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#666' }}>Líder con Mayor Gestión</h3>
-                        <TrendingUp color="var(--success)" size={24} />
+            <div className="grid-stats">
+                <div className="card kpi-card" style={{ borderLeft: '5px solid var(--success)' }}>
+                    <div className="kpi-icon" style={{ background: '#f0fdf4' }}>
+                        <TrendingUp color="var(--success)" size={32} />
                     </div>
-                    <p style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: 0, color: 'var(--primary-dark)' }}>
-                        {topLeaders[0]?.name || 'N/A'}
-                    </p>
-                    <p style={{ fontSize: '0.9rem', color: '#888', marginTop: '5px' }}>
-                        {topLeaders[0]?.voterCount || 0} votantes registrados
-                    </p>
+                    <div>
+                        <h3 className="kpi-value">{topLeaders[0]?.name || 'N/A'}</h3>
+                        <p className="kpi-label">Líder con Mayor Gestión ({topLeaders[0]?.voterCount || 0} registros)</p>
+                    </div>
                 </div>
 
-                <div className="card" style={{ padding: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                        <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#666' }}>Calidad de Datos Global</h3>
-                        <BarChart3 color="var(--primary)" size={24} />
+                <div className="card kpi-card" style={{ borderLeft: '5px solid var(--primary)' }}>
+                    <div className="kpi-icon" style={{ background: '#eff6ff' }}>
+                        <BarChart3 color="var(--primary)" size={32} />
                     </div>
-                    <div style={{ marginTop: '10px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px', fontSize: '0.9rem' }}>
-                            <span>Teléfonos Válidos</span>
-                            <strong>{Math.round((voters.filter(v => v['TELÉFONO']?.trim()).length / totalVoters) * 100)}%</strong>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-                            <span>Puestos Asignados</span>
-                            <strong>{Math.round((voters.filter(v => v['PUESTO DE VOTACIÓN']?.trim()).length / totalVoters) * 100)}%</strong>
-                        </div>
+                    <div>
+                        <h3 className="kpi-value">
+                            {totalVoters > 0 ? Math.round((voters.filter(v => v['TELÉFONO']?.trim()).length / totalVoters) * 100) : 0}%
+                        </h3>
+                        <p className="kpi-label">Calidad de Datos Global (Teléfonos)</p>
                     </div>
                 </div>
             </div>
@@ -96,11 +96,11 @@ export default function AnalysisPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                     {topLeaders.map(l => (
                         <div key={l.name}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px', fontSize: '0.9rem' }}>
+                            <div className="flex-between" style={{ marginBottom: '5px', fontSize: '0.9rem' }}>
                                 <span style={{ fontWeight: '500' }}>{l.name}</span>
-                                <span style={{ color: '#666' }}>{l.voterCount} votantes</span>
+                                <span style={{ color: 'var(--text-muted)' }}>{l.voterCount} votantes</span>
                             </div>
-                            <div style={{ width: '100%', backgroundColor: '#f3f4f6', borderRadius: '4px', height: '10px', overflow: 'hidden' }}>
+                            <div style={{ width: '100%', backgroundColor: '#f3f4f6', borderRadius: '4px', height: '12px', overflow: 'hidden' }}>
                                 <div style={{
                                     width: `${(l.voterCount / maxVotes) * 100}%`,
                                     backgroundColor: 'var(--primary)',
@@ -117,7 +117,7 @@ export default function AnalysisPage() {
             <div className="card">
                 <div style={{ padding: '20px', borderBottom: '1px solid #eee' }}>
                     <h3 style={{ margin: 0 }}>Detalle por Líder</h3>
-                    <p style={{ margin: '5px 0 0 0', color: '#888', fontSize: '0.9rem' }}>
+                    <p style={{ margin: '5px 0 0 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
                         Identifica qué líderes necesitan completar su información.
                     </p>
                 </div>
@@ -148,8 +148,7 @@ export default function AnalysisPage() {
                                                 {contactPercent}%
                                             </span>
                                         </td>
-                                        <td style={{ textAlign: 'center', color: '#666' }}>
-                                            {/* Mini textual summary of what is missing */}
+                                        <td style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
                                             <span style={{ fontSize: '0.85rem' }}>
                                                 Faltan: {leader.voterCount - leader.withPhone} Tels, {leader.voterCount - leader.withAddress} Dirs
                                             </span>
@@ -176,21 +175,21 @@ export default function AnalysisPage() {
             </div>
 
             {/* INFORMATION NEEDED SUMMARY */}
-            <div className="card" style={{ marginTop: '20px', backgroundColor: '#f8fafc', border: '1px border #e2e8f0' }}>
+            <div className="card" style={{ marginTop: '20px', backgroundColor: '#f8fafc' }}>
                 <div style={{ padding: '20px' }}>
                     <h3 style={{ margin: '0 0 10px 0', color: 'var(--primary-dark)' }}>ℹ️ Resumen de Información Faltante</h3>
-                    <p style={{ lineHeight: '1.6', color: '#475569' }}>
+                    <p style={{ lineHeight: '1.6', color: 'var(--text-main)' }}>
                         Para asegurar el éxito de la logística el día D, necesitamos completar la siguiente información prioritaria:
                     </p>
-                    <ul style={{ marginTop: '10px', paddingLeft: '20px', color: '#475569' }}>
+                    <ul style={{ marginTop: '10px', paddingLeft: '20px', color: 'var(--text-main)' }}>
                         <li style={{ marginBottom: '5px' }}>
-                            <strong>Teléfonos de Contacto:</strong> Hay <strong>{voters.length - voters.filter(v => v['TELÉFONO']?.trim()).length}</strong> votantes sin número. Es vital para la confirmación.
+                            <strong>Teléfonos de Contacto:</strong> Faltan <strong>{voters.length - voters.filter(v => v['TELÉFONO']?.trim()).length}</strong> números.
                         </li>
                         <li style={{ marginBottom: '5px' }}>
-                            <strong>Direcciones Exactas:</strong> Necesarias para coordinar el transporte. Faltan <strong>{voters.length - voters.filter(v => v['DIRECCIÓN DE RESIDENCIA']?.trim()).length}</strong> direcciones.
+                            <strong>Direcciones Exactas:</strong> Faltan <strong>{voters.length - voters.filter(v => v['DIRECCIÓN DE RESIDENCIA']?.trim()).length}</strong> direcciones.
                         </li>
                         <li>
-                            <strong>Puesto de Votación:</strong> Crítico para la zonificación. Faltan <strong>{voters.length - voters.filter(v => v['PUESTO DE VOTACIÓN']?.trim()).length}</strong> asignaciones.
+                            <strong>Puesto de Votación:</strong> Faltan <strong>{voters.length - voters.filter(v => v['PUESTO DE VOTACIÓN']?.trim()).length}</strong> asignaciones.
                         </li>
                     </ul>
                 </div>

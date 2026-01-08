@@ -1,207 +1,188 @@
 import { useState, useMemo } from 'react';
 import { useVoters } from '../../context/VoterContext';
-import { Filter, Download, Search } from 'lucide-react';
-import PlatformLogo from '../../assets/logo-compromiso-white.png';
-
-const TABLE_HEADERS = [
-    'LÍDER',
-    'NOMBRES',
-    'APELLIDOS',
-    'No DE CÉDULA SIN PUNTOS',
-    'TELÉFONO',
-    'DIRECCIÓN DE RESIDENCIA',
-    'BARRIO DE RESIDENCIA',
-    'PUESTO DE VOTACIÓN',
-    'DIRECCIÓN (Pto de votación)',
-    'MESA',
-    'MUNICIPIO VOTACIÓN'
-];
+import { Search, Filter, Download } from 'lucide-react';
+import AdminHeader from '../../components/AdminHeader';
+import SkeletonLoader from '../../components/SkeletonLoader';
 
 export default function ConsolidatedViewPage() {
     const { voters, isLoading } = useVoters();
-    const [selectedLeader, setSelectedLeader] = useState<string>('Todos');
     const [searchTerm, setSearchTerm] = useState('');
-    const [exportMessage, setExportMessage] = useState<string | null>(null);
+    const [selectedLeader, setSelectedLeader] = useState('Todos');
+    const [exportMessage, setExportMessage] = useState('');
 
-    // Extract unique leaders for the filter dropdown
-    const leaders = useMemo(() => {
-        const unique = new Set(voters.map(v => v['LÍDER']?.trim()).filter(Boolean));
-        return ['Todos', ...Array.from(unique).sort()];
-    }, [voters]);
-
-    // Filter data based on selection and search
     const filteredData = useMemo(() => {
         return voters.filter(voter => {
-            const matchesLeader = selectedLeader === 'Todos' || (voter['LÍDER']?.trim() === selectedLeader);
-
-            const searchLower = searchTerm.toLowerCase();
-            const matchesSearch = !searchTerm ||
-                (voter['NOMBRES']?.toLowerCase().includes(searchLower)) ||
-                (voter['APELLIDOS']?.toLowerCase().includes(searchLower)) ||
-                (voter['No DE CÉDULA SIN PUNTOS']?.includes(searchTerm));
-
-            return matchesLeader && matchesSearch;
+            const matchesSearch = (
+                (voter.first_name + ' ' + voter.last_name).toLowerCase().includes(searchTerm.toLowerCase()) ||
+                voter.document_number.includes(searchTerm)
+            );
+            const matchesLeader = selectedLeader === 'Todos' || voter.leader_name === selectedLeader;
+            return matchesSearch && matchesLeader;
         });
-    }, [voters, selectedLeader, searchTerm]);
+    }, [voters, searchTerm, selectedLeader]);
 
-    const handleExport = () => {
-        // Simple CSV export logic reusing standard browser capabilities
-        const csvContent = "data:text/csv;charset=utf-8,"
-            + TABLE_HEADERS.join(";") + "\n"
-            + filteredData.map(row => {
-                return TABLE_HEADERS.map(header => {
-                    const val = row[header] || '';
-                    return `"${String(val).replace(/"/g, '""')}"`; // Escape quotes
-                }).join(";");
-            }).join("\n");
+    const leaders = useMemo(() => {
+        const uniqueLeaders = new Set<string>();
+        voters.forEach(v => {
+            if (v.leader_name) uniqueLeaders.add(v.leader_name);
+        });
+        return Array.from(uniqueLeaders);
+    }, [voters]);
 
-        const encodedUri = encodeURI(csvContent);
+    const handleExportCSV = () => {
+        if (filteredData.length === 0) return;
+
+        const headers = ["Líder", "Nombres", "Apellidos", "Cédula", "Teléfono", "Dirección", "Barrio", "Puesto", "Mesa"];
+        const csvContent = [
+            headers.join(','),
+            ...filteredData.map(v => [
+                v.leader_name,
+                v.first_name,
+                v.last_name,
+                v.document_number,
+                v.phone || '',
+                v.address || '',
+                v.neighborhood || '',
+                v.voting_post || '',
+                v.voting_table || ''
+            ].map(val => `"${val}"`).join(','))
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `consolidado_${selectedLeader}_${new Date().toISOString().split('T')[0]}.csv`);
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `consolidado_votantes_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
 
-        // Show success message
-        setExportMessage(`✅ Archivo exportado: ${filteredData.length} registros`);
-        setTimeout(() => setExportMessage(null), 3000);
+        setExportMessage('¡Exportación exitosa!');
+        setTimeout(() => setExportMessage(''), 3000);
     };
 
-    return (
-        <div>
-            {/* Header Section from ImportPage style */}
-            <div className="import-page-header">
-                <div style={{ marginBottom: '20px' }}>
-                    <img
-                        src={PlatformLogo}
-                        alt="Logo Compromiso Real"
-                        style={{ height: '150px', width: 'auto', display: 'block' }}
-                    />
-                </div>
-                <h2 className="import-page-title">Información Consolidada</h2>
-                <p className="import-description">
-                    Vista general de toda la base de datos con filtros por líder.
-                </p>
+    if (isLoading && voters.length === 0) {
+        return (
+            <div className="container-padding">
+                <SkeletonLoader type="text" count={2} />
+                <SkeletonLoader type="table" count={10} />
             </div>
+        );
+    }
 
-            {/* Controls Card */}
-            <div className="card" style={{ marginBottom: '24px' }}>
-                <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+    return (
+        <div className="consolidated-page">
+            <AdminHeader
+                title="Consolidado General"
+                description="Vista unificada de todos los votantes registrados y sus líderes."
+                actions={
+                    <button className="btn btn-primary" onClick={handleExportCSV} disabled={filteredData.length === 0}>
+                        <Download size={20} />
+                        Exportar CSV
+                    </button>
+                }
+            />
 
-                    {/* Leader Filter */}
-                    <div style={{ flex: 1, minWidth: '250px' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontWeight: 'bold', color: 'var(--text-main)' }}>
-                            <Filter size={18} />
-                            Filtrar por Líder
-                        </label>
-                        <select
-                            value={selectedLeader}
-                            onChange={(e) => setSelectedLeader(e.target.value)}
-                            title="Seleccionar Líder"
-                            aria-label="Filtrar por Líder"
-                            style={{
-                                width: '100%',
-                                padding: '10px 15px',
-                                borderRadius: '8px',
-                                border: '1px solid var(--border-color)',
-                                fontSize: '1rem',
-                                color: 'var(--text-main)',
-                                backgroundColor: 'white'
-                            }}
-                        >
-                            {leaders.map(leader => (
-                                <option key={leader} value={leader}>{leader}</option>
-                            ))}
-                        </select>
+            {exportMessage && (
+                <div className="toast toast-success consolidated-toast">
+                    <div className="flex-between gap-2">
+                        <span>{exportMessage}</span>
                     </div>
+                </div>
+            )}
 
-                    {/* Search Box */}
-                    <div style={{ flex: 1, minWidth: '250px' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontWeight: 'bold', color: 'var(--text-main)' }}>
-                            <Search size={18} />
+            <div className="card mb-2">
+                <div className="flex-wrap items-end">
+                    <div className="flex-1 min-w-300">
+                        <label className="section-title block mb-1 text-sm">
                             Buscar Votante
                         </label>
-                        <input
-                            type="text"
-                            placeholder="Nombre, Apellido o Cédula..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            style={{
-                                width: '100%',
-                                padding: '10px 15px',
-                                borderRadius: '8px',
-                                border: '1px solid var(--border-color)',
-                                fontSize: '1rem'
-                            }}
-                        />
+                        <div className="relative">
+                            <Search size={20} className="search-icon-absolute" />
+                            <input
+                                type="text"
+                                className="search-input pl-11"
+                                placeholder="Nombre o cédula..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
                     </div>
 
-                    {/* Export Button */}
-                    <div>
-                        <button
-                            onClick={handleExport}
-                            className="btn btn-secondary"
-                            style={{ height: '42px', display: 'flex', alignItems: 'center', gap: '8px' }}
-                        >
-                            <Download size={18} />
-                            Exportar Vista
-                        </button>
-                        {exportMessage && (
-                            <span style={{
-                                padding: '10px 16px',
-                                background: '#10b981',
-                                color: 'white',
-                                borderRadius: '8px',
-                                fontSize: '0.9rem',
-                                fontWeight: '500'
-                            }}>
-                                {exportMessage}
-                            </span>
-                        )}
+                    <div className="w-250">
+                        <label className="section-title block mb-1 text-sm">
+                            Filtrar por Líder
+                        </label>
+                        <div className="relative">
+                            <Filter size={20} className="search-icon-absolute text-muted" />
+                            <select
+                                className="search-input pl-11"
+                                value={selectedLeader}
+                                onChange={(e) => setSelectedLeader(e.target.value)}
+                                title="Filtrar por Líder"
+                            >
+                                <option value="Todos">Todos los líderes</option>
+                                {leaders.sort().map(leader => (
+                                    <option key={leader} value={leader}>{leader}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* Data Table */}
-            <div className="card" style={{ overflow: 'hidden' }}>
-                <div style={{ marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h3 style={{ margin: 0 }}>
-                        {selectedLeader === 'Todos' ? 'Todos los Registros' : `Equipo de ${selectedLeader}`}
-                        <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 'normal', marginLeft: '10px' }}>
-                            ({filteredData.length} registros encontrados)
-                        </span>
-                    </h3>
-                </div>
-
-                <div className="table-container" style={{ maxHeight: '600px', overflowY: 'auto' }}>
-                    {isLoading ? (
-                        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Cargando datos...</div>
-                    ) : filteredData.length > 0 ? (
-                        <table style={{ width: '100%', minWidth: '1200px' }}>
-                            <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                                <tr>
-                                    {TABLE_HEADERS.map(header => (
-                                        <th key={header} style={{ whiteSpace: 'nowrap' }}>{header}</th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredData.map((row, idx) => (
-                                    <tr key={row._id || idx}>
-                                        {TABLE_HEADERS.map(col => (
-                                            <td key={`${idx}-${col}`}>{row[col] || '-'}</td>
-                                        ))}
+            <div className="table-container">
+                {isLoading ? (
+                    <div className="container-padding">
+                        <SkeletonLoader type="table" count={10} />
+                    </div>
+                ) : (
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nombre Completo</th>
+                                <th>Cédula</th>
+                                <th>Líder Asignado</th>
+                                <th>Municipio</th>
+                                <th>Puesto</th>
+                                <th>Mesa</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredData.length > 0 ? (
+                                filteredData.map((voter) => (
+                                    <tr key={voter.id}>
+                                        <td className="font-600">{voter.first_name || ''} {voter.last_name || ''}</td>
+                                        <td className="text-muted">{voter.document_number}</td>
+                                        <td>
+                                            <span className="badge badge-success">
+                                                {voter.leader_name}
+                                            </span>
+                                        </td>
+                                        <td>{voter.municipality || 'Atlántico'}</td>
+                                        <td className="text-sm">{voter.voting_post || 'N/A'}</td>
+                                        <td>
+                                            <span className="badge badge-subtle">
+                                                {voter.voting_table || '-'}
+                                            </span>
+                                        </td>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    ) : (
-                        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                            No se encontraron registros coinciden con los filtros.
-                        </div>
-                    )}
-                </div>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={6} className="text-center padding-3rem text-muted">
+                                        No se encontraron votantes con los filtros seleccionados.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                )}
+            </div>
+
+            <div className="mt-1 text-muted text-sm font-500">
+                Mostrando {filteredData.length} de {voters.length} votantes registrados.
             </div>
         </div>
     );

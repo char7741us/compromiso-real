@@ -3,7 +3,7 @@ import Papa from 'papaparse';
 import { Upload, AlertCircle, CheckCircle, FileSpreadsheet, Database } from 'lucide-react';
 import { useVoters, type VoterData } from '../../context/VoterContext';
 import { supabase } from '../../supabase';
-import PlatformLogo from '../../assets/logo-compromiso-white.png';
+import AdminHeader from '../../components/AdminHeader';
 
 // Exact columns provided by user
 const EXPECTED_COLUMNS = [
@@ -34,7 +34,7 @@ export default function ImportPage() {
 
     const parseFile = (file: File, encoding: string, delimiter: string | undefined, attempt: number) => {
         Papa.parse(file, {
-            header: false, // We will handle headers manually to support headerless files
+            header: false,
             skipEmptyLines: true,
             encoding: encoding,
             delimiter: delimiter,
@@ -45,7 +45,6 @@ export default function ImportPage() {
                     return;
                 }
 
-                // Strategy: Look for "LÍDER" to identify if there's a header row
                 const firstRow = rows[0].map(cell => cell.trim());
                 const leaderHeaderIndex = firstRow.findIndex(cell => cell.toUpperCase() === 'LÍDER');
 
@@ -53,7 +52,6 @@ export default function ImportPage() {
                 let missingColumns: string[] = [];
 
                 if (leaderHeaderIndex !== -1) {
-                    // Case A: Header Row Detected
                     const headerMap: { [key: string]: number } = {};
                     firstRow.forEach((colName, idx) => {
                         headerMap[colName.toUpperCase()] = idx;
@@ -71,9 +69,7 @@ export default function ImportPage() {
                         });
                     }
                 } else {
-                    // Case B: No Header Row Detected (Assume Standard Order)
                     if (firstRow.length >= EXPECTED_COLUMNS.length) {
-                        console.log("No header found, assuming standard order.");
                         formattedData = rows.map(row => {
                             const obj: VoterData = {};
                             EXPECTED_COLUMNS.forEach((col, index) => {
@@ -92,9 +88,6 @@ export default function ImportPage() {
                     setSuccess(`¡Lectura exitosa! Se encontraron ${formattedData.length} registros. Listo para guardar.`);
                     return;
                 }
-
-                // Failure - Retry Logic
-                console.log(`Attempt ${attempt} failed. Encoding: ${encoding}, Delimiter: ${delimiter}`);
 
                 if (attempt === 1) {
                     parseFile(file, 'ISO-8859-1', undefined, 2);
@@ -134,20 +127,15 @@ export default function ImportPage() {
         setSaveStatus("Verificando conexión...");
 
         try {
-            // 1. Check Credentials
             const { error: healthHighCheck } = await supabase.from('leaders').select('count', { count: 'exact', head: true });
-
-            // If we get a generic connection error or 401/403, it likely means missing credentials or tables
             if (healthHighCheck && (healthHighCheck.code === 'PGRST301' || healthHighCheck.message.includes('fetch'))) {
-                throw new Error("No se pudo conectar a Supabase. ¿Has configurado las variables de entorno VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY?");
+                throw new Error("No se pudo conectar a Supabase.");
             }
 
-            // 2. Extract Unique Leaders
             setSaveStatus("Procesando líderes...");
             const leadersMap = new Map<string, string>();
             const uniqueLeaderNames = Array.from(new Set(data.map(d => d['LÍDER']?.trim()).filter(Boolean)));
 
-            // Upsert Leaders
             for (const leaderName of uniqueLeaderNames) {
                 const { data: leaderData, error: leaderError } = await supabase
                     .from('leaders')
@@ -155,22 +143,16 @@ export default function ImportPage() {
                     .select('id')
                     .single();
 
-                if (leaderError) {
-                    console.error("Error saving leader:", leaderName, leaderError);
-                    continue; // Skip this one but try others
-                }
-                if (leaderData) {
-                    leadersMap.set(leaderName, leaderData.id);
-                }
+                if (leaderError) continue;
+                if (leaderData) leadersMap.set(leaderName, leaderData.id);
             }
 
-            // 3. Prepare Voters
             setSaveStatus(`Guardando ${data.length} votantes...`);
             const votersPayload = data.map(v => ({
                 leader_id: leadersMap.get(v['LÍDER']?.trim()) || null,
                 first_name: v['NOMBRES'] || '',
                 last_name: v['APELLIDOS'] || '',
-                document_number: v['No DE CÉDULA SIN PUNTOS'] || '', // Constraint violation risk if duplicate
+                document_number: v['No DE CÉDULA SIN PUNTOS'] || '',
                 phone: v['TELÉFONO'],
                 address: v['DIRECCIÓN DE RESIDENCIA'],
                 neighborhood: v['BARRIO DE RESIDENCIA'],
@@ -183,19 +165,12 @@ export default function ImportPage() {
                 voting_department: v['DEPARTAMENTO VOTACIÓN']
             }));
 
-            // Deduplicate votersPayload based on document_number
-            // If duplicate exists in batch, keep the last one (or first, doesn't matter much for bulk load, usually last is better update)
             const uniqueVotersMap = new Map();
             votersPayload.forEach(voter => {
-                if (voter.document_number) {
-                    uniqueVotersMap.set(voter.document_number, voter);
-                }
+                if (voter.document_number) uniqueVotersMap.set(voter.document_number, voter);
             });
             const uniqueVotersPayload = Array.from(uniqueVotersMap.values());
 
-            console.log(`Original: ${votersPayload.length}, Unique: ${uniqueVotersPayload.length}`);
-
-            // Bulk Insert/Upsert Voters
             const { error: votersError } = await supabase
                 .from('voters')
                 .upsert(uniqueVotersPayload, { onConflict: 'document_number' });
@@ -203,14 +178,11 @@ export default function ImportPage() {
             if (votersError) throw votersError;
 
             setSaveStatus(null);
-            setSuccess(`¡Éxito! Se han guardado ${uniqueVotersPayload.length} votantes y ${uniqueLeaderNames.length} líderes en la base de datos.`);
-
-            // Trigger global refresh so Dashboard updates immediately
+            setSuccess(`¡Éxito! Se han guardado ${uniqueVotersPayload.length} registros.`);
             await refreshVoters();
 
         } catch (err: any) {
-            console.error("Save error:", err);
-            setError(`Error al guardar en base de datos: ${err.message || 'Error desconocido'}. Asegúrate de haber ejecutado el script de creación de tablas.`);
+            setError(`Error al guardar: ${err.message}`);
             setSaveStatus(null);
         } finally {
             setIsSaving(false);
@@ -219,17 +191,10 @@ export default function ImportPage() {
 
     return (
         <div>
-            <div className="import-page-header">
-                <div style={{ marginBottom: '20px' }}>
-                    <img
-                        src={PlatformLogo}
-                        alt="Logo Compromiso Real"
-                        style={{ height: '150px', width: 'auto', display: 'block' }}
-                    />
-                </div>
-                <h2 className="import-page-title">Importar Base de Datos</h2>
-                <p className="import-description">Carga tu archivo Excel/CSV con la estructura oficial.</p>
-            </div>
+            <AdminHeader
+                title="Importar Base de Datos"
+                description="Carga tu archivo Excel/CSV con la estructura oficial."
+            />
 
             <div className="card import-card">
                 <label className={`file-drop-zone ${fileName ? 'active' : ''}`}>
@@ -279,7 +244,6 @@ export default function ImportPage() {
                             className="btn btn-primary"
                             onClick={handleSaveToDatabase}
                             disabled={isSaving}
-                            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                         >
                             {isSaving ? 'Guardando...' : (
                                 <>

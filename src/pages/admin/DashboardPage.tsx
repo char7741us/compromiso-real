@@ -6,7 +6,8 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend
 } from 'recharts';
 import InfographicImage from '../../assets/infographic-stats.jpg';
-import PlatformLogo from '../../assets/logo-compromiso-white.png';
+import AdminHeader from '../../components/AdminHeader';
+import SkeletonLoader from '../../components/SkeletonLoader';
 
 export default function DashboardPage() {
     const { stats, voters, isLoading, refreshVoters } = useVoters();
@@ -21,13 +22,12 @@ export default function DashboardPage() {
         const total = stats.total;
         if (total === 0) return [];
         const missingOne = stats.missingPhone + stats.missingAddress + stats.missingVotingPost;
-        // This is a rough approximation for visualization
         const complete = Math.max(0, total - (missingOne / 3));
         const incomplete = total - complete;
 
         return [
-            { name: 'Datos Completos', value: Math.round(complete), color: '#10b981' }, // Success Green
-            { name: 'Por Completar', value: Math.round(incomplete), color: '#fbbf24' },  // Warning Yellow
+            { name: 'Datos Completos', value: Math.round(complete), color: '#10b981' },
+            { name: 'Por Completar', value: Math.round(incomplete), color: '#fbbf24' },
         ];
     }, [stats]);
 
@@ -39,89 +39,80 @@ export default function DashboardPage() {
             counts[l] = (counts[l] || 0) + 1;
         });
         return Object.entries(counts)
-            .map(([name, count]) => ({ name, Votantes: count })) // Full name and mapped key
+            .map(([name, count]) => ({ name, Votantes: count }))
             .sort((a, b) => b.Votantes - a.Votantes)
             .slice(0, 5);
     }, [voters]);
 
+    if (isLoading && voters.length === 0) {
+        return (
+            <div className="container-padding">
+                <SkeletonLoader type="text" count={3} />
+                <SkeletonLoader type="kpi" count={3} />
+                <SkeletonLoader type="card" count={2} />
+            </div>
+        );
+    }
+
     return (
         <div>
-            {/* HER0 HEADER */}
-            <div className="import-page-header">
-                <div style={{ position: 'relative', zIndex: 2 }}>
-                    <div style={{ marginBottom: '20px' }}>
-                        <img
-                            src={PlatformLogo}
-                            alt="Logo Compromiso Real"
-                            style={{ height: '180px', width: 'auto', display: 'block' }} // Increased size as requested
-                        />
-                    </div>
-                    <h2 className="import-page-title" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '1.8rem' }}>
-                        Dashboard de Control
-                        <Activity color="#60a5fa" size={28} />
-                    </h2>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '20px' }}>
-                        <p className="import-description">
-                            Monitoreo en tiempo real de la estructura y rendimiento.
-                        </p>
-                        <button
-                            onClick={() => refreshVoters()}
-                            className="btn btn-primary"
-                            style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', backdropFilter: 'blur(4px)' }}
-                        >
-                            {isLoading ? 'Sincronizando...' : '🔄 Sincronizar Ahora'}
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <AdminHeader
+                title="Dashboard de Control"
+                description="Monitoreo en tiempo real de la estructura y rendimiento."
+            >
+                <button
+                    onClick={() => refreshVoters()}
+                    className="btn btn-header-sync"
+                >
+                    {isLoading ? 'Sincronizando...' : '🔄 Sincronizar Ahora'}
+                </button>
+            </AdminHeader>
 
-            {/* KPI CARDS - 3D Effect */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px', marginBottom: '30px' }}>
-                <div className="card" style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '20px', borderLeft: '5px solid var(--primary)' }}>
-                    <div style={{ background: '#eff6ff', padding: '15px', borderRadius: '50%' }}>
-                        <Users size={32} color="var(--primary)" />
+            {/* KPI CARDS */}
+            <div className="grid-stats">
+                <div className="card kpi-card kpi-primary">
+                    <div className="kpi-icon icon-primary">
+                        <Users size={32} />
                     </div>
                     <div>
-                        <h3 style={{ fontSize: '2.5rem', fontWeight: '800', margin: 0, color: 'var(--text-main)', lineHeight: '1' }}>
-                            {isLoading ? <span style={{ opacity: 0.5 }}>...</span> : stats.total}
+                        <h3 className="kpi-value">
+                            {isLoading ? <span className="opacity-60">...</span> : stats.total}
                         </h3>
-                        <p style={{ margin: 0, color: 'var(--text-muted)', fontWeight: '500' }}>Votantes Totales</p>
+                        <p className="kpi-label">Votantes Totales</p>
                     </div>
                 </div>
 
-                <div className="card" style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '20px', borderLeft: '5px solid var(--success)' }}>
-                    <div style={{ background: '#f0fdf4', padding: '15px', borderRadius: '50%' }}>
-                        <UserCheck size={32} color="var(--success)" />
+                <div className="card kpi-card kpi-success">
+                    <div className="kpi-icon icon-success">
+                        <UserCheck size={32} />
                     </div>
                     <div>
-                        <h3 style={{ fontSize: '2.5rem', fontWeight: '800', margin: 0, color: 'var(--text-main)', lineHeight: '1' }}>
-                            {isLoading ? <span style={{ opacity: 0.5 }}>...</span> : uniqueLeaders}
+                        <h3 className="kpi-value">
+                            {isLoading ? <span className="opacity-60">...</span> : uniqueLeaders}
                         </h3>
-                        <p style={{ margin: 0, color: 'var(--text-muted)', fontWeight: '500' }}>Líderes Activos</p>
+                        <p className="kpi-label">Líderes Activos</p>
                     </div>
                 </div>
 
-                <div className="card" style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '20px', borderLeft: '5px solid var(--secondary)' }}>
-                    <div style={{ background: '#f1f5f9', padding: '15px', borderRadius: '50%' }}>
-                        <FileSpreadsheet size={32} color="var(--secondary)" />
+                <div className="card kpi-card kpi-secondary">
+                    <div className="kpi-icon icon-secondary">
+                        <FileSpreadsheet size={32} />
                     </div>
                     <div>
-                        <h3 style={{ fontSize: '2.5rem', fontWeight: '800', margin: 0, color: 'var(--text-main)', lineHeight: '1' }}>
-                            {stats.missingPhone + stats.missingAddress}
+                        <h3 className="kpi-value">
+                            {isLoading ? <span className="opacity-60">...</span> : stats.missingPhone + stats.missingAddress}
                         </h3>
-                        <p style={{ margin: 0, color: 'var(--text-muted)', fontWeight: '500' }}>Registros Incompletos</p>
+                        <p className="kpi-label">Registros Incompletos</p>
                     </div>
                 </div>
             </div>
 
             {/* CHARTS ROW */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
-
-                {/* Visual #1: Top Leaders */}
-                <div className="card" style={{ minHeight: '400px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-                        <h3 style={{ margin: 0 }}>🏆 Top 5 Gestión</h3>
-                        <TrendingUp size={20} color="var(--text-muted)" />
+            <div className="grid-charts">
+                <div className="card h-400">
+                    <div className="flex-between mb-1">
+                        <h3 className="m-0">🏆 Top 5 Gestión</h3>
+                        <TrendingUp size={20} className="text-muted" />
                     </div>
                     <ResponsiveContainer width="100%" height={300}>
                         <BarChart data={topLeaders} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
@@ -137,11 +128,10 @@ export default function DashboardPage() {
                     </ResponsiveContainer>
                 </div>
 
-                {/* Visual #2: Data Quality */}
-                <div className="card" style={{ minHeight: '400px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-                        <h3 style={{ margin: 0 }}>📊 Calidad de la Base</h3>
-                        <Activity size={20} color="var(--text-muted)" />
+                <div className="card h-400">
+                    <div className="flex-between mb-1">
+                        <h3 className="m-0">📊 Calidad de la Base</h3>
+                        <Activity size={20} className="text-muted" />
                     </div>
                     <ResponsiveContainer width="100%" height={300}>
                         <PieChart>
@@ -163,18 +153,17 @@ export default function DashboardPage() {
                         </PieChart>
                     </ResponsiveContainer>
                 </div>
-
             </div>
 
             {/* QUICK ACTIONS */}
-            <div className="card" style={{ marginTop: '24px', background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)' }}>
-                <h3 style={{ marginBottom: '15px' }}>⚡ Acciones Rápidas</h3>
-                <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-                    <a href="/admin/import" className="btn btn-primary" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div className="card mt-2 quick-actions-gradient">
+                <h3 className="mb-1">⚡ Acciones Rápidas</h3>
+                <div className="flex-wrap gap-3">
+                    <a href="/admin/import" className="btn btn-primary no-underline">
                         <FileSpreadsheet size={18} />
                         Importar Nuevos Datos
                     </a>
-                    <a href="/admin/missing-data" className="btn btn-secondary" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <a href="/admin/missing-data" className="btn btn-secondary no-underline">
                         <AlertTriangle size={18} />
                         Gestionar Faltantes
                     </a>
@@ -182,22 +171,19 @@ export default function DashboardPage() {
             </div>
 
             {/* INFOGRAPHIC SECTION */}
-            <div className="card" style={{ marginTop: '24px', overflow: 'hidden', padding: '0', border: 'none' }}>
-                <div style={{ padding: '20px 20px 10px 20px', borderBottom: '1px solid var(--border-color, #e2e8f0)' }}>
-                    <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className="card mt-2 p-0 overflow-hidden no-border">
+                <div className="card-header-padding border-bottom">
+                    <h3 className="m-0 flex items-center gap-2">
                         📊 Análisis Gráfico Detallado
                     </h3>
                 </div>
                 <img
                     src={InfographicImage}
                     alt="Infografía de Estadísticas"
-                    style={{
-                        width: '100%',
-                        height: 'auto',
-                        display: 'block'
-                    }}
+                    className="w-full h-auto block"
                 />
             </div>
         </div>
     );
 }
+

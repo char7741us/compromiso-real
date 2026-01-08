@@ -1,4 +1,5 @@
-import { LayoutDashboard, Upload, Map as MapIcon, AlertCircle, BarChart3, ListChecks } from 'lucide-react';
+import { LayoutDashboard, Upload, Map as MapIcon, AlertCircle, BarChart3, ListChecks, LogOut } from 'lucide-react';
+import { supabase } from '../supabase';
 import { NavLink, Outlet } from 'react-router-dom';
 import PlatformLogo from '../assets/logo-compromiso-sidebar.png';
 
@@ -38,8 +39,20 @@ export default function Layout() {
                     </NavLink>
                 </nav>
 
-                <div style={{ marginTop: 'auto', padding: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    v1.0.0
+                <div style={{ marginTop: 'auto', padding: '1rem', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
+                    <button
+                        onClick={() => {
+                            supabase.auth.signOut().then(() => window.location.href = '/login');
+                        }}
+                        className="nav-item flex items-center gap-3 w-full"
+                        style={{ border: 'none', background: 'none', cursor: 'pointer', width: '100%' }}
+                    >
+                        <LogOut size={20} />
+                        <span>Cerrar Sesión</span>
+                    </button>
+                    <div style={{ marginTop: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        v1.0.0
+                    </div>
                 </div>
             </aside>
 

@@ -8,28 +8,40 @@ import MissingDataPage from './pages/admin/MissingDataPage';
 
 import AnalysisPage from './pages/admin/AnalysisPage';
 import ConsolidatedViewPage from './pages/admin/ConsolidatedViewPage';
+import MapPage from './pages/admin/MapPage';
 
-// Placeholder pages for things not yet built
-const MapPage = () => <div><h2 className="page-title">Mapa Territorial</h2><p>Visualización geográfica próximamente.</p></div>;
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import LoginPage from './pages/LoginPage';
 
 function App() {
     return (
-        <VoterProvider>
-            <Router>
-                <Routes>
-                    <Route path="/" element={<Layout />}>
-                        <Route index element={<Navigate to="/admin/dashboard" replace />} />
-                        <Route path="admin/dashboard" element={<DashboardPage />} />
-                        <Route path="admin/import" element={<ImportPage />} />
-                        <Route path="admin/consolidated" element={<ConsolidatedViewPage />} />
-                        <Route path="admin/missing-data" element={<MissingDataPage />} />
-                        <Route path="map" element={<MapPage />} />
-                        <Route path="analysis" element={<AnalysisPage />} />
+        <AuthProvider>
+            <VoterProvider>
+                <Router>
+                    <Routes>
+                        {/* Public Route */}
+                        <Route path="/login" element={<LoginPage />} />
+
+                        {/* Protected Routes */}
+                        <Route path="/" element={<ProtectedRoute />}>
+                            <Route element={<Layout />}>
+                                <Route index element={<Navigate to="/admin/dashboard" replace />} />
+                                <Route path="admin/dashboard" element={<DashboardPage />} />
+                                <Route path="admin/import" element={<ImportPage />} />
+                                <Route path="admin/consolidated" element={<ConsolidatedViewPage />} />
+                                <Route path="admin/missing-data" element={<MissingDataPage />} />
+                                <Route path="map" element={<MapPage />} />
+                                <Route path="analysis" element={<AnalysisPage />} />
+                            </Route>
+                        </Route>
+
+                        {/* Fallback */}
                         <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
-                    </Route>
-                </Routes>
-            </Router>
-        </VoterProvider>
+                    </Routes>
+                </Router>
+            </VoterProvider>
+        </AuthProvider>
     );
 }
 
