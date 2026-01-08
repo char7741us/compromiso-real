@@ -82,7 +82,9 @@ export default function DashboardPage() {
                         <Users size={32} color="var(--primary)" />
                     </div>
                     <div>
-                        <h3 style={{ fontSize: '2.5rem', fontWeight: '800', margin: 0, color: 'var(--text-main)', lineHeight: '1' }}>{stats.total}</h3>
+                        <h3 style={{ fontSize: '2.5rem', fontWeight: '800', margin: 0, color: 'var(--text-main)', lineHeight: '1' }}>
+                            {isLoading ? <span style={{ opacity: 0.5 }}>...</span> : stats.total}
+                        </h3>
                         <p style={{ margin: 0, color: 'var(--text-muted)', fontWeight: '500' }}>Votantes Totales</p>
                     </div>
                 </div>
@@ -92,7 +94,9 @@ export default function DashboardPage() {
                         <UserCheck size={32} color="var(--success)" />
                     </div>
                     <div>
-                        <h3 style={{ fontSize: '2.5rem', fontWeight: '800', margin: 0, color: 'var(--text-main)', lineHeight: '1' }}>{uniqueLeaders}</h3>
+                        <h3 style={{ fontSize: '2.5rem', fontWeight: '800', margin: 0, color: 'var(--text-main)', lineHeight: '1' }}>
+                            {isLoading ? <span style={{ opacity: 0.5 }}>...</span> : uniqueLeaders}
+                        </h3>
                         <p style={{ margin: 0, color: 'var(--text-muted)', fontWeight: '500' }}>Líderes Activos</p>
                     </div>
                 </div>

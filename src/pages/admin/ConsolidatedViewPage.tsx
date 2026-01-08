@@ -21,6 +21,7 @@ export default function ConsolidatedViewPage() {
     const { voters, isLoading } = useVoters();
     const [selectedLeader, setSelectedLeader] = useState<string>('Todos');
     const [searchTerm, setSearchTerm] = useState('');
+    const [exportMessage, setExportMessage] = useState<string | null>(null);
 
     // Extract unique leaders for the filter dropdown
     const leaders = useMemo(() => {
@@ -34,7 +35,7 @@ export default function ConsolidatedViewPage() {
             const matchesLeader = selectedLeader === 'Todos' || (voter['LÍDER']?.trim() === selectedLeader);
 
             const searchLower = searchTerm.toLowerCase();
-            const matchesSearch =
+            const matchesSearch = !searchTerm ||
                 (voter['NOMBRES']?.toLowerCase().includes(searchLower)) ||
                 (voter['APELLIDOS']?.toLowerCase().includes(searchLower)) ||
                 (voter['No DE CÉDULA SIN PUNTOS']?.includes(searchTerm));
@@ -61,6 +62,10 @@ export default function ConsolidatedViewPage() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+
+        // Show success message
+        setExportMessage(`✅ Archivo exportado: ${filteredData.length} registros`);
+        setTimeout(() => setExportMessage(null), 3000);
     };
 
     return (
@@ -142,6 +147,18 @@ export default function ConsolidatedViewPage() {
                             <Download size={18} />
                             Exportar Vista
                         </button>
+                        {exportMessage && (
+                            <span style={{
+                                padding: '10px 16px',
+                                background: '#10b981',
+                                color: 'white',
+                                borderRadius: '8px',
+                                fontSize: '0.9rem',
+                                fontWeight: '500'
+                            }}>
+                                {exportMessage}
+                            </span>
+                        )}
                     </div>
                 </div>
             </div>
