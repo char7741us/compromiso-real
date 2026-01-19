@@ -1,5 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useVoters } from '../../context/VoterContext';
+import { supabase } from '../../supabase';
 import { Users, UserCheck, FileSpreadsheet, AlertTriangle, TrendingUp, Activity } from 'lucide-react';
 import {
     PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
@@ -10,19 +11,49 @@ import AdminHeader from '../../components/AdminHeader';
 import SkeletonLoader from '../../components/SkeletonLoader';
 
 export default function DashboardPage() {
-    const { stats, voters, isLoading, refreshVoters } = useVoters();
+    const { stats, isLoading, refreshVoters } = useVoters();
+    const [topLeaders, setTopLeaders] = useState<{name: string, Votantes: number}[]>([]);
+    const [uniqueLeadersCount, setUniqueLeadersCount] = useState(0);
+    const [loadingExtras, setLoadingExtras] = useState(true);
 
-    // Stats for Unique Leaders
-    const uniqueLeaders = useMemo(() => {
-        return new Set(voters.map(v => v['LÍDER']?.trim()).filter(Boolean)).size;
-    }, [voters]);
+    useEffect(() => {
+        const fetchDashboardExtra = async () => {
+            try {
+                // Get Leader Stats
+                const { data: leadersData } = await supabase
+                    .from('leaders')
+                    .select(`
+                        full_name,
+                        voters(count)
+                    `);
+
+                if (leadersData) {
+                    setUniqueLeadersCount(leadersData.length);
+
+                    // Sort client side (leaders list is usually manageable < 1000)
+                    const formatted = leadersData.map((l: any) => ({
+                        name: l.full_name,
+                        Votantes: l.voters?.[0]?.count || 0
+                    }));
+                    formatted.sort((a, b) => b.Votantes - a.Votantes);
+                    setTopLeaders(formatted.slice(0, 5));
+                }
+            } catch (e) {
+                console.error("Error loading dashboard extras", e);
+            } finally {
+                setLoadingExtras(false);
+            }
+        };
+
+        fetchDashboardExtra();
+    }, []);
 
     // Data for Pie Chart (Data Quality)
     const dataQuality = useMemo(() => {
         const total = stats.total;
         if (total === 0) return [];
         const missingOne = stats.missingPhone + stats.missingAddress + stats.missingVotingPost;
-        const complete = Math.max(0, total - (missingOne / 3));
+        const complete = Math.max(0, total - (missingOne / 3)); // Approximation since we don't know overlap
         const incomplete = total - complete;
 
         return [
@@ -31,20 +62,7 @@ export default function DashboardPage() {
         ];
     }, [stats]);
 
-    // Data for Bar Chart (Top 5 Leaders)
-    const topLeaders = useMemo(() => {
-        const counts: Record<string, number> = {};
-        voters.forEach(v => {
-            const l = v['LÍDER']?.trim() || 'Sin Asignar';
-            counts[l] = (counts[l] || 0) + 1;
-        });
-        return Object.entries(counts)
-            .map(([name, count]) => ({ name, Votantes: count }))
-            .sort((a, b) => b.Votantes - a.Votantes)
-            .slice(0, 5);
-    }, [voters]);
-
-    if (isLoading && voters.length === 0) {
+    if (isLoading && stats.total === 0) {
         return (
             <div className="container-padding">
                 <SkeletonLoader type="text" count={3} />
@@ -88,7 +106,7 @@ export default function DashboardPage() {
                     </div>
                     <div>
                         <h3 className="kpi-value">
-                            {isLoading ? <span className="opacity-60">...</span> : uniqueLeaders}
+                            {loadingExtras ? <span className="opacity-60">...</span> : uniqueLeadersCount}
                         </h3>
                         <p className="kpi-label">Líderes Activos</p>
                     </div>

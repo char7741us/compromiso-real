@@ -4,6 +4,7 @@ import { Upload, AlertCircle, CheckCircle, FileSpreadsheet, Database } from 'luc
 import { useVoters, type VoterData } from '../../context/VoterContext';
 import { supabase } from '../../supabase';
 import AdminHeader from '../../components/AdminHeader';
+import { batchUpsert } from '../../utils/supabaseHelpers';
 
 // Exact columns provided by user
 const EXPECTED_COLUMNS = [
@@ -24,7 +25,7 @@ const EXPECTED_COLUMNS = [
 ];
 
 export default function ImportPage() {
-    const { setVoters, refreshVoters } = useVoters();
+    const { refreshVoters } = useVoters();
     const [data, setData] = useState<VoterData[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
@@ -84,7 +85,6 @@ export default function ImportPage() {
 
                 if (missingColumns.length === 0 && formattedData.length > 0) {
                     setData(formattedData);
-                    setVoters(formattedData);
                     setSuccess(`¡Lectura exitosa! Se encontraron ${formattedData.length} registros. Listo para guardar.`);
                     return;
                 }
@@ -125,6 +125,8 @@ export default function ImportPage() {
     const handleSaveToDatabase = async () => {
         setIsSaving(true);
         setSaveStatus("Verificando conexión...");
+        setSuccess(null);
+        setError(null);
 
         try {
             const { error: healthHighCheck } = await supabase.from('leaders').select('count', { count: 'exact', head: true });
@@ -133,21 +135,20 @@ export default function ImportPage() {
             }
 
             setSaveStatus("Procesando líderes...");
-            const leadersMap = new Map<string, string>();
             const uniqueLeaderNames = Array.from(new Set(data.map(d => d['LÍDER']?.trim()).filter(Boolean)));
 
-            for (const leaderName of uniqueLeaderNames) {
-                const { data: leaderData, error: leaderError } = await supabase
-                    .from('leaders')
-                    .upsert({ full_name: leaderName }, { onConflict: 'full_name' })
-                    .select('id')
-                    .single();
+            // 1. Batch Upsert Leaders
+            const leaderPayloads = uniqueLeaderNames.map(name => ({ full_name: name }));
+            await batchUpsert(supabase, 'leaders', leaderPayloads, 500);
 
-                if (leaderError) continue;
-                if (leaderData) leadersMap.set(leaderName, leaderData.id);
+            // 2. Refresh Leaders Map
+            const leadersMap = new Map<string, string>();
+            const { data: allLeaders } = await supabase.from('leaders').select('id, full_name');
+            if (allLeaders) {
+                allLeaders.forEach(l => leadersMap.set(l.full_name, l.id));
             }
 
-            setSaveStatus(`Guardando ${data.length} votantes...`);
+            setSaveStatus(`Preparando ${data.length} votantes...`);
             const votersPayload = data.map(v => ({
                 leader_id: leadersMap.get(v['LÍDER']?.trim()) || null,
                 first_name: v['NOMBRES'] || '',
@@ -165,21 +166,35 @@ export default function ImportPage() {
                 voting_department: v['DEPARTAMENTO VOTACIÓN']
             }));
 
+            // Filter unique by document number to avoid payload duplicates before DB
             const uniqueVotersMap = new Map();
             votersPayload.forEach(voter => {
                 if (voter.document_number) uniqueVotersMap.set(voter.document_number, voter);
             });
             const uniqueVotersPayload = Array.from(uniqueVotersMap.values());
 
-            const { error: votersError } = await supabase
-                .from('voters')
-                .upsert(uniqueVotersPayload, { onConflict: 'document_number' });
+            setSaveStatus(`Iniciando guardado de ${uniqueVotersPayload.length} registros...`);
 
-            if (votersError) throw votersError;
+            // 3. Batch Upsert Voters
+            const { successCount, errors } = await batchUpsert(
+                supabase,
+                'voters',
+                uniqueVotersPayload,
+                1000,
+                (processed, total) => {
+                    setSaveStatus(`Guardando votantes... ${processed} / ${total}`);
+                }
+            );
+
+            if (errors.length > 0) {
+                console.error("Batch errors:", errors);
+                setSuccess(`Proceso finalizado con advertencias. ${successCount} guardados. Hubo errores en algunos bloques.`);
+            } else {
+                setSuccess(`¡Éxito Total! Se han guardado ${successCount} registros.`);
+            }
 
             setSaveStatus(null);
-            setSuccess(`¡Éxito! Se han guardado ${uniqueVotersPayload.length} registros.`);
-            await refreshVoters();
+            await refreshVoters(); // Refresh global stats
 
         } catch (err: any) {
             setError(`Error al guardar: ${err.message}`);
@@ -253,7 +268,7 @@ export default function ImportPage() {
                             )}
                         </button>
                     </div>
-                    {saveStatus && <p style={{ color: 'var(--primary)', fontWeight: 'bold', marginTop: '10px' }}>{saveStatus}</p>}
+                    {saveStatus && <p className="text-primary font-bold mt-2 animate-pulse">{saveStatus}</p>}
 
                     <div className="table-container">
                         <table>
