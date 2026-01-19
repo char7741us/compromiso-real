@@ -1,7 +1,7 @@
 import { LayoutDashboard, Upload, Map as MapIcon, AlertCircle, BarChart3, ListChecks, LogOut, Users, BookOpen } from 'lucide-react';
 import { supabase } from '../supabase';
 import { NavLink, Outlet } from 'react-router-dom';
-import PlatformLogo from '../assets/logo-report.png';
+import PlatformLogo from '../assets/logo-gold.png';
 
 export default function Layout() {
     return (
