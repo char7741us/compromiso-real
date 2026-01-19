@@ -18,12 +18,22 @@ export const calculateLeaderStats = (voters: VoterData[]): LeaderStats => {
     let invalidId = 0;
 
     voters.forEach(v => {
-        const hasId = v.document_number && v.document_number.length > 5; // Basic validation
+        // Use the application's definition of Invalid ID (mapped from DB is_invalid_cc)
+        const isInvalidCC = v['INVALIDA'] === true;
         const hasVotingPost = !!v.voting_post;
 
-        if (!hasId) invalidId++;
-        if (!hasVotingPost) missingInfo++;
-        if (hasId && hasVotingPost) complete++;
+        if (isInvalidCC) {
+            invalidId++;
+        }
+
+        if (!hasVotingPost) {
+            missingInfo++;
+        }
+
+        // A record is complete if it has a valid ID and a voting post
+        if (!isInvalidCC && hasVotingPost) {
+            complete++;
+        }
     });
 
     return { total, complete, missingInfo, invalidId };
@@ -31,7 +41,7 @@ export const calculateLeaderStats = (voters: VoterData[]): LeaderStats => {
 
 const getVoterStatus = (voter: VoterData): string => {
     const issues = [];
-    if (!voter.document_number || voter.document_number.length < 5) issues.push("CC Inválida");
+    if (voter['INVALIDA'] === true) issues.push("CC Inválida");
     if (!voter.voting_post) issues.push("Falta Puesto");
 
     return issues.length === 0 ? "OK" : issues.join(", ");
