@@ -1,5 +1,5 @@
 import React from 'react';
-import PlatformLogo from '../assets/logo-dark-bg.png';
+import { appConfig } from '../config/appConfig';
 
 interface AdminHeaderProps {
     title: string;
@@ -15,8 +15,8 @@ export default function AdminHeader({ title, description, children, actions }: A
                 <div className="flex-between admin-header-top">
                     <div className="admin-header-logo-container">
                         <img
-                            src={PlatformLogo}
-                            alt="Platform Logo"
+                            src={appConfig.assets.dashboardLogo}
+                            alt="Logo"
                             className="admin-header-logo"
                         />
                     </div>

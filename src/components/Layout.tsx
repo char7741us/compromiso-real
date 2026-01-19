@@ -1,15 +1,15 @@
 import { LayoutDashboard, Upload, Map as MapIcon, AlertCircle, BarChart3, ListChecks, LogOut, Users, BookOpen } from 'lucide-react';
 import { supabase } from '../supabase';
 import { NavLink, Outlet } from 'react-router-dom';
-import PlatformLogo from '../assets/logo-gold.png';
+import { appConfig } from '../config/appConfig';
 
 export default function Layout() {
     return (
         <div className="app-layout">
             <aside className="sidebar">
                 <div className="sidebar-header">
-                    <img src={PlatformLogo} alt="Logo" className="sidebar-logo" />
-                    <h1 className="sidebar-title">Compromiso Real</h1>
+                    <img src={appConfig.assets.sidebarLogo} alt="Logo" className="sidebar-logo" />
+                    <h1 className="sidebar-title">{appConfig.brand.name}</h1>
                 </div>
 
                 <nav className="sidebar-nav">
@@ -58,7 +58,7 @@ export default function Layout() {
                         <span>Cerrar Sesión</span>
                     </button>
                     <div className="sidebar-version">
-                        v2.0
+                        v{appConfig.brand.version}
                     </div>
                 </div>
             </aside>

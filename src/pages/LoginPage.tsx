@@ -4,7 +4,7 @@ import { supabase } from '../supabase';
 import { SecurityGuard } from '../utils/SecurityGuard';
 import { toast } from 'react-hot-toast';
 import { useLoading } from '../context/LoadingContext';
-import PlatformLogo from '../assets/logo-dark-bg.png';
+import { appConfig } from '../config/appConfig';
 
 const LoginPage: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -68,12 +68,12 @@ const LoginPage: React.FC = () => {
             <div className="login-card glass-effect">
                 <div className="login-brand-section">
                     <img
-                        src={PlatformLogo}
-                        alt="Compromiso Real Logo"
+                        src={appConfig.assets.mainLogo}
+                        alt={`${appConfig.brand.name} Logo`}
                         className="login-logo-img"
                     />
                     <h1 className="login-title">Acceso Administrativo</h1>
-                    <p className="login-subtitle">Plataforma de Gestión Territorial</p>
+                    <p className="login-subtitle">{appConfig.brand.tagline}</p>
                 </div>
 
                 <form onSubmit={handleLogin} className="login-form">

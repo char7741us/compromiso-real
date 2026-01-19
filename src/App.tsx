@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import ImportPage from './pages/admin/ImportPage';
-import LeadersPage from './pages/admin/LeadersPage';
+import LeaderManagement from './pages/admin/LeaderManagement';
 import { VoterProvider } from './context/VoterContext';
 
 import DashboardPage from './pages/admin/DashboardPage';
@@ -29,22 +29,22 @@ function App() {
                     <Router>
                         <Routes>
                             {/* Public Route */}
-                        <Route path="/login" element={<LoginPage />} />
+                            <Route path="/login" element={<LoginPage />} />
 
-                        {/* Protected Routes */}
-                        <Route path="/" element={<ProtectedRoute />}>
-                            <Route element={<Layout />}>
-                                <Route index element={<Navigate to="/admin/dashboard" replace />} />
-                                <Route path="admin/dashboard" element={<DashboardPage />} />
-                                <Route path="admin/import" element={<ImportPage />} />
-                                <Route path="admin/consolidated" element={<ConsolidatedViewPage />} />
-                                <Route path="admin/leaders" element={<LeadersPage />} />
-                                <Route path="admin/missing-data" element={<MissingDataPage />} />
-                                <Route path="map" element={<MapPage />} />
-                                <Route path="analysis" element={<AnalysisPage />} />
-                                <Route path="admin/instructions" element={<InstructionsPage />} />
+                            {/* Protected Routes */}
+                            <Route path="/" element={<ProtectedRoute />}>
+                                <Route element={<Layout />}>
+                                    <Route index element={<Navigate to="/admin/dashboard" replace />} />
+                                    <Route path="admin/dashboard" element={<DashboardPage />} />
+                                    <Route path="admin/import" element={<ImportPage />} />
+                                    <Route path="admin/consolidated" element={<ConsolidatedViewPage />} />
+                                    <Route path="admin/leaders" element={<LeaderManagement />} />
+                                    <Route path="admin/missing-data" element={<MissingDataPage />} />
+                                    <Route path="map" element={<MapPage />} />
+                                    <Route path="analysis" element={<AnalysisPage />} />
+                                    <Route path="admin/instructions" element={<InstructionsPage />} />
+                                </Route>
                             </Route>
-                        </Route>
 
                             {/* Fallback */}
                             <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />

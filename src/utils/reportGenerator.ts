@@ -3,7 +3,7 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 import type { VoterData } from '../context/VoterContext';
-import LogoReport from '../assets/logo-report.png';
+import { appConfig } from '../config/appConfig';
 
 interface LeaderStats {
     total: number;
@@ -76,7 +76,7 @@ export const generateLeaderPDF = async (leaderName: string, voters: VoterData[])
     const date = new Date().toLocaleDateString('es-CO');
 
     try {
-        const logoData = await getImageData(LogoReport);
+        const logoData = await getImageData(appConfig.assets.reportLogo);
         // Add Logo: x, y, width, height (Adjusted for logo aspect ratio)
         doc.addImage(logoData, 'PNG', 14, 10, 50, 25);
     } catch (error) {
