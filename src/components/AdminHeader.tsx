@@ -1,5 +1,5 @@
 import React from 'react';
-import PlatformLogo from '../assets/logo-compromiso-white.png';
+import PlatformLogo from '../assets/logo-dark-bg.png';
 
 interface AdminHeaderProps {
     title: string;
