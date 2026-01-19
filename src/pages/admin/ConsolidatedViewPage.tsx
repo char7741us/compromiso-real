@@ -103,11 +103,11 @@ export default function ConsolidatedViewPage() {
                             {selectedLeader === 'Todos' ? 'ZIP PDFs' : 'PDF'}
                         </button>
                         <button
-                            className="btn btn-success flex items-center gap-2"
+
                             onClick={() => handleDownloadReport('excel')}
                             disabled={isGenerating || filteredData.length === 0}
                             title={selectedLeader === 'Todos' ? "Descargar Todos (ZIP)" : "Descargar Excel"}
-                            style={{ backgroundColor: '#217346', color: 'white', border: 'none' }}
+                            className="btn flex items-center gap-2 bg-[#217346] text-white hover:bg-[#1a5c38] border-none"
                         >
                             {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <FileSpreadsheet size={18} />}
                             {selectedLeader === 'Todos' ? 'ZIP Excel' : 'Excel'}
@@ -117,17 +117,16 @@ export default function ConsolidatedViewPage() {
             />
 
             <div className="card mb-2">
-                <div className="flex-wrap items-end" style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
+                <div className="flex flex-wrap items-end gap-4">
                     <div className="flex-1 min-w-300">
                         <label className="section-title block mb-1 text-sm">
                             Buscar Votante
                         </label>
                         <div className="relative">
-                            <Search size={20} className="search-icon-absolute" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#888' }} />
+                            <Search size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                             <input
                                 type="text"
-                                className="search-input pl-11"
-                                style={{ paddingLeft: '2.5rem', width: '100%', padding: '0.5rem 0.5rem 0.5rem 2.5rem', borderRadius: '6px', border: '1px solid #ddd' }}
+                                className="pl-10 w-full py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                                 placeholder="Nombre o cédula..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -135,15 +134,14 @@ export default function ConsolidatedViewPage() {
                         </div>
                     </div>
 
-                    <div className="w-250" style={{ minWidth: '250px' }}>
+                    <div className="w-250 min-w-[250px]">
                         <label className="section-title block mb-1 text-sm">
                             Filtrar por Líder
                         </label>
                         <div className="relative">
-                            <Filter size={20} className="search-icon-absolute text-muted" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#888' }} />
+                            <Filter size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                             <select
-                                className="search-input pl-11"
-                                style={{ paddingLeft: '2.5rem', width: '100%', padding: '0.5rem 0.5rem 0.5rem 2.5rem', borderRadius: '6px', border: '1px solid #ddd' }}
+                                className="pl-10 w-full py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                                 value={selectedLeader}
                                 onChange={(e) => setSelectedLeader(e.target.value)}
                                 title="Filtrar por Líder"

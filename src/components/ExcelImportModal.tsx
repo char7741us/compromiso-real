@@ -181,7 +181,7 @@ export default function ExcelImportModal({ type, leaderId, onClose, onSuccess }:
 
                             {/* Table */}
                             <div className="flex-1 overflow-auto border border-slate-200 rounded-lg">
-                                <table className="w-full text-sm text-left">
+                                <table className="w-full text-sm text-left whitespace-nowrap">
                                     <thead className="text-xs uppercase bg-slate-50 text-slate-500 sticky top-0">
                                         <tr>
                                             <th className="px-4 py-2">Estado</th>

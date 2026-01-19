@@ -1,18 +1,62 @@
-import { LayoutDashboard, Upload, Map as MapIcon, AlertCircle, BarChart3, ListChecks, LogOut, Users, BookOpen } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { LayoutDashboard, Upload, Map as MapIcon, AlertCircle, BarChart3, ListChecks, LogOut, Users, BookOpen, Menu, X } from 'lucide-react';
 import { supabase } from '../supabase';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { appConfig } from '../config/appConfig';
 
 export default function Layout() {
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const location = useLocation();
+
+    // Close sidebar on route change (mobile)
+    useEffect(() => {
+        setIsSidebarOpen(false);
+    }, [location]);
+
     return (
         <div className="app-layout">
-            <aside className="sidebar">
-                <div className="sidebar-header">
-                    <img src={appConfig.assets.sidebarLogo} alt="Logo" className="sidebar-logo" />
-                    <h1 className="sidebar-title">{appConfig.brand.name}</h1>
+            {/* Mobile Header */}
+            <header className="mobile-header lg:hidden">
+                <button
+                    onClick={() => setIsSidebarOpen(true)}
+                    className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                    aria-label="Abrir menú"
+                    title="Abrir menú"
+                >
+                    <Menu size={24} />
+                </button>
+                <div className="flex items-center gap-2">
+                    <img src={appConfig.assets.sidebarLogo} alt="Logo" className="h-8 w-auto" />
+                    <span className="font-bold text-slate-800">{appConfig.brand.name}</span>
+                </div>
+            </header>
+
+            {/* Mobile Overlay */}
+            {isSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm transition-opacity"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
+
+            <aside className={`sidebar ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
+                <div className="sidebar-header flex justify-between items-center lg:block">
+                    <div className="w-full relative">
+                        {/* Close button for mobile */}
+                        <button
+                            onClick={() => setIsSidebarOpen(false)}
+                            className="absolute right-0 top-0 lg:hidden p-2 text-slate-400 hover:text-slate-600"
+                            aria-label="Cerrar menú"
+                            title="Cerrar menú"
+                        >
+                            <X size={20} />
+                        </button>
+                        <img src={appConfig.assets.sidebarLogo} alt="Logo" className="sidebar-logo mx-auto" />
+                        <h1 className="sidebar-title mt-2 text-center">{appConfig.brand.name}</h1>
+                    </div>
                 </div>
 
-                <nav className="sidebar-nav">
+                <nav className="sidebar-nav flex-1 overflow-y-auto">
                     <NavLink to="/" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
                         <LayoutDashboard size={20} />
                         <span>Dashboard</span>
@@ -57,7 +101,7 @@ export default function Layout() {
                         <LogOut size={20} />
                         <span>Cerrar Sesión</span>
                     </button>
-                    <div className="sidebar-version">
+                    <div className="sidebar-version text-center">
                         v{appConfig.brand.version}
                     </div>
                 </div>

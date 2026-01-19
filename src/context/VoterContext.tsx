@@ -40,7 +40,9 @@ export function VoterProvider({ children }: { children: ReactNode }) {
                 .select(`
                     *,
                     leaders (
-                        full_name
+                        full_name,
+                        zone,
+                        goal
                     )
                 `)
                 .order('created_at', { ascending: false })
@@ -57,6 +59,8 @@ export function VoterProvider({ children }: { children: ReactNode }) {
                     ...row,
                     'LÍDER': row.leaders?.full_name || 'Sin Asignar',
                     leader_name: row.leaders?.full_name || 'Sin Asignar',
+                    leader_zone: row.leaders?.zone || 'Sin Zona',
+                    leader_goal: row.leaders?.goal || 0,
                     'NOMBRES': row.first_name,
                     'APELLIDOS': row.last_name,
                     'No DE CÉDULA SIN PUNTOS': row.document_number,

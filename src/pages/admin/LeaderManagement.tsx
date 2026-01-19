@@ -103,16 +103,16 @@ export default function LeaderManagement() {
                 title="Gestión de Estructura"
                 description="Administración integral de líderes, metas y votantes."
                 actions={
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                         <button
                             onClick={() => setShowImportModal(true)}
-                            className="btn btn-secondary flex items-center gap-2"
+                            className="btn btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto"
                         >
                             <Upload size={18} /> Importar
                         </button>
                         <button
                             onClick={openCreate}
-                            className="btn btn-primary bg-gradient-to-r from-yellow-600 to-yellow-500 text-slate-900 font-bold border-none shadow-lg shadow-yellow-500/20 flex items-center gap-2"
+                            className="btn btn-primary bg-gradient-to-r from-yellow-600 to-yellow-500 text-slate-900 font-bold border-none shadow-lg shadow-yellow-500/20 flex items-center justify-center gap-2 w-full sm:w-auto"
                         >
                             <Plus size={18} /> Nuevo Líder
                         </button>
@@ -124,8 +124,8 @@ export default function LeaderManagement() {
             <LeaderStatsView stats={stats} />
 
             {/* Filters & Search */}
-            <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                <div className="relative w-full md:w-96">
+            <div className="flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div className="relative w-full xl:w-96">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input
                         type="text"
@@ -136,7 +136,7 @@ export default function LeaderManagement() {
                     />
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 w-full xl:w-auto justify-end">
                     <div className="flex items-center bg-slate-100 rounded-lg p-1 border border-slate-200">
                         <button
                             onClick={() => setViewMode('grid')}

@@ -131,35 +131,44 @@ export default function VoterManagementModal({ leader, onClose }: VoterManagemen
                 )}
 
                 {/* Voters List */}
-                <div className="flex-1 overflow-y-auto p-4">
+                <div className="flex-1 overflow-y-auto p-4 bg-slate-50">
                     {isLoading ? (
                         <div className="text-center py-10 text-slate-500">Cargando votantes...</div>
                     ) : filteredVoters.length === 0 ? (
                         <div className="text-center py-10 text-slate-500 italic">No hay votantes registrados.</div>
                     ) : (
-                        <table className="w-full text-sm text-left">
-                            <thead className="text-xs uppercase bg-slate-50 text-slate-500 sticky top-0">
-                                <tr>
-                                    <th className="px-4 py-3 rounded-l-lg">Nombre</th>
-                                    <th className="px-4 py-3">Cédula</th>
-                                    <th className="px-4 py-3">Teléfono</th>
-                                    <th className="px-4 py-3 text-right rounded-r-lg">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-200">
-                                {filteredVoters.map(voter => (
-                                    <tr key={voter.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-4 py-3 font-medium text-slate-700">{voter.first_name} {voter.last_name}</td>
-                                        <td className="px-4 py-3 text-slate-600">{voter.document_number}</td>
-                                        <td className="px-4 py-3 text-slate-600">{voter.phone || '-'}</td>
-                                        <td className="px-4 py-3 text-right flex justify-end gap-2">
-                                            {/* Edit could be implemented here similarly */}
-                                            <button onClick={() => handleDeleteVoter(voter.id)} className="text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors" title="Eliminar votante"><Trash2 size={14} /></button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                        <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-left whitespace-nowrap">
+                                    <thead className="text-xs uppercase bg-slate-50 text-slate-500 border-b border-slate-200">
+                                        <tr>
+                                            <th className="px-4 py-3 font-semibold">Nombre</th>
+                                            <th className="px-4 py-3 font-semibold">Cédula</th>
+                                            <th className="px-4 py-3 font-semibold">Teléfono</th>
+                                            <th className="px-4 py-3 text-right font-semibold">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {filteredVoters.map(voter => (
+                                            <tr key={voter.id} className="hover:bg-slate-50 transition-colors">
+                                                <td className="px-4 py-3 font-medium text-slate-700">{voter.first_name} {voter.last_name}</td>
+                                                <td className="px-4 py-3 text-slate-500 font-mono text-xs">{voter.document_number}</td>
+                                                <td className="px-4 py-3 text-slate-500">{voter.phone || '-'}</td>
+                                                <td className="px-4 py-3 text-right">
+                                                    <button
+                                                        onClick={() => handleDeleteVoter(voter.id)}
+                                                        className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-full transition-all"
+                                                        title="Eliminar votante"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     )}
                 </div>
             </div>
