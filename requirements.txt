@@ -5,3 +5,4 @@ streamlit-folium
 requests
 plotly
 openpyxl
+numpy
