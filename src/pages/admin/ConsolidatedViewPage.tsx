@@ -13,8 +13,8 @@ export default function ConsolidatedViewPage() {
     const filteredData = useMemo(() => {
         return voters.filter(voter => {
             const matchesSearch = (
-                (voter.first_name + ' ' + voter.last_name).toLowerCase().includes(searchTerm.toLowerCase()) ||
-                voter.document_number.includes(searchTerm)
+                ((voter.first_name || '') + ' ' + (voter.last_name || '')).toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (voter.document_number || '').includes(searchTerm)
             );
             const matchesLeader = selectedLeader === 'Todos' || voter.leader_name === selectedLeader;
             return matchesSearch && matchesLeader;
@@ -39,9 +39,9 @@ export default function ConsolidatedViewPage() {
             headers.join(','),
             ...filteredData.map(v => [
                 v.leader_name,
-                v.first_name,
-                v.last_name,
-                v.document_number,
+                v.first_name || '',
+                v.last_name || '',
+                v.document_number || '',
                 v.phone || '',
                 v.address || '',
                 v.neighborhood || '',
@@ -156,7 +156,7 @@ export default function ConsolidatedViewPage() {
                                 filteredData.map((voter) => (
                                     <tr key={voter.id}>
                                         <td className="font-600">{voter.first_name || ''} {voter.last_name || ''}</td>
-                                        <td className="text-muted">{voter.document_number}</td>
+                                        <td className="text-muted">{voter.document_number || ''}</td>
                                         <td>
                                             <span className="badge badge-success">
                                                 {voter.leader_name}
