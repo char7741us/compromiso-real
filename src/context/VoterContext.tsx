@@ -1,15 +1,14 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { supabase } from '../supabase';
+import type { Voter } from '../types';
 
-// Define the shape of a Voter record based on the CSV columns
-export interface VoterData {
-    [key: string]: any;
-}
+// Deprecated alias for backward compatibility if needed, but Voter is preferred
+export type VoterData = Voter;
 
 interface VoterContextType {
-    voters: VoterData[];
-    setVoters: (data: VoterData[]) => void;
-    updateVoter: (id: string, updates: Partial<VoterData>) => Promise<{ success: boolean; error?: string }>;
+    voters: Voter[];
+    setVoters: (data: Voter[]) => void;
+    updateVoter: (id: string, updates: Partial<Voter>) => Promise<{ success: boolean; error?: string }>;
     refreshVoters: () => Promise<void>;
     isLoading: boolean;
     stats: {
@@ -24,7 +23,7 @@ interface VoterContextType {
 const VoterContext = createContext<VoterContextType | undefined>(undefined);
 
 export function VoterProvider({ children }: { children: ReactNode }) {
-    const [voters, setVoters] = useState<VoterData[]>([]);
+    const [voters, setVoters] = useState<Voter[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     const refreshVoters = async () => {
@@ -45,12 +44,14 @@ export function VoterProvider({ children }: { children: ReactNode }) {
 
             if (error) {
                 console.error("Error fetching voters:", error);
+                // Optionally handle error state here
                 return;
             }
 
             if (data) {
                 // Map DB columns back to UI expected keys (CSV headers) for compatibility
-                const mappedData: VoterData[] = data.map((row: any) => ({
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const mappedData: Voter[] = data.map((row: any) => ({
                     ...row,
                     'LÍDER': row.leaders?.full_name || 'Sin Asignar',
                     leader_name: row.leaders?.full_name || 'Sin Asignar',
@@ -77,7 +78,7 @@ export function VoterProvider({ children }: { children: ReactNode }) {
     };
 
     // Update locally and in Supabase
-    const updateVoter = async (id: string, updates: Partial<VoterData>): Promise<{ success: boolean; error?: string }> => {
+    const updateVoter = async (id: string, updates: Partial<Voter>): Promise<{ success: boolean; error?: string }> => {
         console.log("updateVoter called for:", id, "with updates:", updates);
 
         // 1. Optimistic Update
@@ -86,6 +87,7 @@ export function VoterProvider({ children }: { children: ReactNode }) {
         ));
 
         // 2. Persist to Supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const dbUpdates: any = {};
         if (updates['TELÉFONO'] !== undefined) dbUpdates.phone = updates['TELÉFONO'];
         if (updates['DIRECCIÓN DE RESIDENCIA'] !== undefined) dbUpdates.address = updates['DIRECCIÓN DE RESIDENCIA'];
@@ -109,14 +111,16 @@ export function VoterProvider({ children }: { children: ReactNode }) {
 
                 if (error) {
                     console.error("Error updating voter in DB:", error);
+                    // Revert optimistic update if needed?
                     return { success: false, error: error.message };
                 } else {
                     console.log("Supabase update successful");
                     return { success: true };
                 }
-            } catch (err: any) {
+            } catch (err: unknown) {
                 console.error("Unexpected error updating voter:", err);
-                return { success: false, error: err?.message || "Unknown error" };
+                const message = err instanceof Error ? err.message : "Unknown error";
+                return { success: false, error: message };
             }
         } else {
             console.warn("No valid DB updates found to send.");
@@ -127,21 +131,35 @@ export function VoterProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         refreshVoters();
 
-        // Real-time subscription
-        const channel = supabase
+        // Real-time subscription for Voters
+        const votersChannel = supabase
             .channel('public:voters')
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'voters' },
                 (payload) => {
-                    console.log('Real-time change detected:', payload);
+                    console.log('Real-time change detected in voters:', payload);
+                    refreshVoters();
+                }
+            )
+            .subscribe();
+
+        // Real-time subscription for Leaders (to update leader names in dashboard)
+        const leadersChannel = supabase
+            .channel('public:leaders')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'leaders' },
+                (payload) => {
+                    console.log('Real-time change detected in leaders:', payload);
                     refreshVoters();
                 }
             )
             .subscribe();
 
         return () => {
-            supabase.removeChannel(channel);
+            supabase.removeChannel(votersChannel);
+            supabase.removeChannel(leadersChannel);
         };
     }, []);
 

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
 import { Upload, AlertCircle, CheckCircle, FileSpreadsheet, Database } from 'lucide-react';
-import { useVoters, type VoterData } from '../../context/VoterContext';
+import { useVoters } from '../../context/VoterContext';
+import type { Voter } from '../../types';
 import { supabase } from '../../supabase';
 import AdminHeader from '../../components/AdminHeader';
 
@@ -23,9 +24,49 @@ const EXPECTED_COLUMNS = [
     'MUNICIPIO VOTACIÓN'
 ];
 
+// Helper to fix Mojibake (e.g. Ã± -> ñ)
+const fixMojibake = (text: string): string => {
+    if (!text) return "";
+    try {
+        // Simple heuristic: if it contains typical UTF-8 interpreted as Latin-1 chars
+        if (text.match(/[ÃÂ]/)) {
+             const bytes = new Uint8Array(text.split('').map(c => c.charCodeAt(0)));
+             return new TextDecoder('utf-8').decode(bytes);
+        }
+    } catch (_) {
+        // ignore
+    }
+    return text;
+};
+
+const NORMALIZE_MAP: {[key: string]: string} = {
+    'LIDER': 'LÍDER',
+    'NOMBRE LIDER': 'LÍDER',
+    'CEDULA': 'No DE CÉDULA SIN PUNTOS',
+    'NO DE CEDULA': 'No DE CÉDULA SIN PUNTOS',
+    'TELEFONO': 'TELÉFONO',
+    'DIRECCION': 'DIRECCIÓN DE RESIDENCIA',
+    'DIRECCION DE RESIDENCIA': 'DIRECCIÓN DE RESIDENCIA',
+    'PUESTO': 'PUESTO DE VOTACIÓN',
+    'PUESTO DE VOTACION': 'PUESTO DE VOTACIÓN',
+    'DIRECCION (PTO DE VOTACION)': 'DIRECCIÓN (Pto de votación)',
+    'DIRECCIÓN (PTO DE VOTACIÓN)': 'DIRECCIÓN (Pto de votación)',
+    'MESA': 'MESA',
+    'BARRIO': 'BARRIO DE RESIDENCIA',
+    'BARRIO DE RESIDENCIA': 'BARRIO DE RESIDENCIA',
+    'MUNICIPIO': 'MUNICIPIO RESIDENCIA',
+    'MUNICIPIO RESIDENCIA': 'MUNICIPIO RESIDENCIA',
+    'DEPARTAMENTO': 'DEPARTAMENTO RESIDENCIA'
+};
+
+const normalizeColumnName = (col: string) => {
+    const upper = col.toUpperCase().replace(/['"]/g, '').trim();
+    return NORMALIZE_MAP[upper] || upper;
+};
+
 export default function ImportPage() {
     const { setVoters, refreshVoters } = useVoters();
-    const [data, setData] = useState<VoterData[]>([]);
+    const [data, setData] = useState<Voter[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     const [fileName, setFileName] = useState<string | null>(null);
@@ -45,38 +86,47 @@ export default function ImportPage() {
                     return;
                 }
 
-                const firstRow = rows[0].map(cell => cell.trim());
-                const leaderHeaderIndex = firstRow.findIndex(cell => cell.toUpperCase() === 'LÍDER');
+                // Clean first row (headers)
+                const firstRow = rows[0].map(cell => normalizeColumnName(fixMojibake(cell.trim())));
 
-                let formattedData: VoterData[] = [];
+                // Find LÍDER column
+                const leaderHeaderIndex = firstRow.findIndex(cell => cell === 'LÍDER');
+
+                let formattedData: Voter[] = [];
                 let missingColumns: string[] = [];
 
                 if (leaderHeaderIndex !== -1) {
                     const headerMap: { [key: string]: number } = {};
                     firstRow.forEach((colName, idx) => {
-                        headerMap[colName.toUpperCase()] = idx;
+                        headerMap[colName] = idx;
                     });
 
-                    missingColumns = EXPECTED_COLUMNS.filter(col => headerMap[col.toUpperCase()] === undefined);
+                    // Check which expected columns are missing
+                    missingColumns = EXPECTED_COLUMNS.filter(col => headerMap[col] === undefined);
 
                     if (missingColumns.length === 0) {
-                        formattedData = rows.slice(1).map(row => {
-                            const obj: VoterData = {};
+                        formattedData = rows.slice(1).map((row, rowIndex) => {
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            const obj: any = { _id: `temp-${rowIndex}` };
                             EXPECTED_COLUMNS.forEach(col => {
-                                obj[col] = row[headerMap[col.toUpperCase()]]?.trim() || '';
+                                const val = row[headerMap[col]]?.trim() || '';
+                                obj[col] = fixMojibake(val);
                             });
-                            return obj;
+                            // Fill defaults for Voter interface
+                            obj['INVALIDA'] = false;
+                            return obj as Voter;
                         });
                     }
                 } else {
+                    // Fallback to position-based if headers don't match but count matches?
+                    // This is risky, but let's see if we have exact count
                     if (firstRow.length >= EXPECTED_COLUMNS.length) {
-                        formattedData = rows.map(row => {
-                            const obj: VoterData = {};
-                            EXPECTED_COLUMNS.forEach((col, index) => {
-                                obj[col] = row[index]?.trim() || '';
-                            });
-                            return obj;
-                        });
+                         // Check if at least some columns match to avoid completely wrong mapping
+                         // For now, let's just try to map by index if headers fail completely
+                         // But we prefer header mapping.
+
+                         // If we didn't find LIDER, maybe the normalization failed or it's missing.
+                         missingColumns = ["LÍDER (No encontrada)"];
                     } else {
                         missingColumns = [`Estructura desconocida. Se esperaban ${EXPECTED_COLUMNS.length} columnas, pero se encontraron ${firstRow.length}.`];
                     }
@@ -89,6 +139,7 @@ export default function ImportPage() {
                     return;
                 }
 
+                // If failed, try next encoding/delimiter
                 if (attempt === 1) {
                     parseFile(file, 'ISO-8859-1', undefined, 2);
                 } else if (attempt === 2) {
@@ -98,7 +149,7 @@ export default function ImportPage() {
                 } else {
                     let errorMsg = `No se pudo leer el archivo correctamente.`;
                     if (missingColumns.length > 0) {
-                        errorMsg += `\n\nProblema detectado: ${missingColumns.join(', ')}`;
+                        errorMsg += `\n\nProblema detectado: Faltan columnas: ${missingColumns.join(', ')}`;
                     }
                     setError(errorMsg);
                     setData([]);
@@ -162,7 +213,8 @@ export default function ImportPage() {
                 voting_post_address: v['DIRECCIÓN (Pto de votación)'],
                 voting_table: v['MESA'],
                 voting_municipality: v['MUNICIPIO VOTACIÓN'],
-                voting_department: v['DEPARTAMENTO VOTACIÓN']
+                voting_department: v['DEPARTAMENTO VOTACIÓN'],
+                is_invalid_cc: v['INVALIDA']
             }));
 
             const uniqueVotersMap = new Map();
@@ -181,8 +233,9 @@ export default function ImportPage() {
             setSuccess(`¡Éxito! Se han guardado ${uniqueVotersPayload.length} registros.`);
             await refreshVoters();
 
-        } catch (err: any) {
-            setError(`Error al guardar: ${err.message}`);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            setError(`Error al guardar: ${message}`);
             setSaveStatus(null);
         } finally {
             setIsSaving(false);

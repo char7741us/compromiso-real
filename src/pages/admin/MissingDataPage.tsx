@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useVoters, type VoterData } from '../../context/VoterContext';
+import { useVoters } from '../../context/VoterContext';
+import type { Voter } from '../../types';
 import { Search, Save, ExternalLink, Filter, AlertCircle, ChevronDown, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AdminHeader from '../../components/AdminHeader';
@@ -10,27 +11,10 @@ import { generateInvalidCCReport } from '../../utils/reportUtils';
 export default function MissingDataPage() {
     const { voters, setVoters, updateVoter, isLoading } = useVoters();
     const [searchParams] = useSearchParams();
-    const [filter, setFilter] = useState('all');
+    const [filter, setFilter] = useState(searchParams.get('filter') === 'invalid_cc' ? 'invalid_cc' : 'all');
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedLeader, setSelectedLeader] = useState('all');
     const [visibleCount, setVisibleCount] = useState(50);
-
-    // Auto-expand list when filtering by leader to check all
-    useEffect(() => {
-        if (selectedLeader !== 'all') {
-            setVisibleCount(10000);
-        } else {
-            setVisibleCount(50);
-        }
-    }, [selectedLeader]);
-
-    // Check for URL params
-    useEffect(() => {
-        const urlFilter = searchParams.get('filter');
-        if (urlFilter === 'invalid_cc') {
-            setFilter('invalid_cc');
-        }
-    }, [searchParams]);
 
     if (isLoading) {
         return (
@@ -65,21 +49,19 @@ export default function MissingDataPage() {
 
     const activeLeaders = Array.from(new Set(voters.map(v => v['LÍDER']))).filter(Boolean).sort();
 
-    const handleUpdateById = (id: string, field: string, value: any) => {
+    const handleUpdateById = (id: string, field: string, value: string | boolean) => {
         const index = voters.findIndex(v => v._id === id);
         if (index === -1) return;
 
         const newVoters = [...voters];
-        newVoters[index] = {
-            ...newVoters[index],
-            [field]: value
-        };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (newVoters[index] as any)[field] = value;
         setVoters(newVoters);
     };
 
-    const handleManualSave = async (voter: VoterData) => {
+    const handleManualSave = async (voter: Voter) => {
         try {
-            const updates: Partial<VoterData> = {
+            const updates: Partial<Voter> = {
                 'No DE CÉDULA SIN PUNTOS': voter['No DE CÉDULA SIN PUNTOS'] || '',
                 'INVALIDA': voter['INVALIDA'] || false,
                 'TELÉFONO': voter['TELÉFONO'] || '',
@@ -169,10 +151,14 @@ export default function MissingDataPage() {
                                 className="search-input"
                                 style={{ paddingLeft: '40px', appearance: 'none' }}
                                 value={selectedLeader}
-                                onChange={(e) => setSelectedLeader(e.target.value)}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    setSelectedLeader(val);
+                                    setVisibleCount(val !== 'all' ? 10000 : 50);
+                                }}
                             >
                                 <option value="all">Todos los Líderes</option>
-                                {activeLeaders.map((leader: any) => (
+                                {activeLeaders.map((leader) => (
                                     <option key={leader} value={leader}>{leader}</option>
                                 ))}
                             </select>
