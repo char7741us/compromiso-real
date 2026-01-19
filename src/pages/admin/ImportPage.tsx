@@ -20,7 +20,8 @@ const EXPECTED_COLUMNS = [
     'DIRECCIÓN (Pto de votación)',
     'MESA',
     'DEPARTAMENTO VOTACIÓN',
-    'MUNICIPIO VOTACIÓN'
+    'MUNICIPIO VOTACIÓN',
+    'INVALIDA'
 ];
 
 export default function ImportPage() {
@@ -57,28 +58,37 @@ export default function ImportPage() {
                         headerMap[colName.toUpperCase()] = idx;
                     });
 
-                    missingColumns = EXPECTED_COLUMNS.filter(col => headerMap[col.toUpperCase()] === undefined);
+                    // Allow INVALIDA to be optional for backward compatibility
+                    missingColumns = EXPECTED_COLUMNS.filter(col => col !== 'INVALIDA' && headerMap[col.toUpperCase()] === undefined);
 
                     if (missingColumns.length === 0) {
                         formattedData = rows.slice(1).map(row => {
                             const obj: VoterData = {};
                             EXPECTED_COLUMNS.forEach(col => {
-                                obj[col] = row[headerMap[col.toUpperCase()]]?.trim() || '';
+                                const idx = headerMap[col.toUpperCase()];
+                                obj[col] = (idx !== undefined ? row[idx]?.trim() : '') || '';
                             });
                             return obj;
                         });
                     }
                 } else {
-                    if (firstRow.length >= EXPECTED_COLUMNS.length) {
+                    // Check if we have at least the required columns (excluding optional INVALIDA)
+                    const requiredCount = EXPECTED_COLUMNS.filter(c => c !== 'INVALIDA').length;
+
+                    if (firstRow.length >= requiredCount) {
                         formattedData = rows.map(row => {
                             const obj: VoterData = {};
                             EXPECTED_COLUMNS.forEach((col, index) => {
+                                // Fallback logic might be risky here if columns are not in order.
+                                // But this else block assumes "headerless" or "structure unknown but count matches".
+                                // If headers are missing, we assume order matches EXPECTED_COLUMNS.
+                                // If INVALIDA is last, and data lacks it, it's fine.
                                 obj[col] = row[index]?.trim() || '';
                             });
                             return obj;
                         });
                     } else {
-                        missingColumns = [`Estructura desconocida. Se esperaban ${EXPECTED_COLUMNS.length} columnas, pero se encontraron ${firstRow.length}.`];
+                        missingColumns = [`Estructura desconocida. Se esperaban al menos ${requiredCount} columnas.`];
                     }
                 }
 
@@ -148,11 +158,19 @@ export default function ImportPage() {
             }
 
             setSaveStatus(`Guardando ${data.length} votantes...`);
+
+            const parseBoolean = (val: any): boolean => {
+                if (!val) return false;
+                const s = String(val).trim().toUpperCase();
+                return ['TRUE', 'SI', 'SÍ', 'YES', '1', 'ON'].includes(s);
+            };
+
             const votersPayload = data.map(v => ({
                 leader_id: leadersMap.get(v['LÍDER']?.trim()) || null,
                 first_name: v['NOMBRES'] || '',
                 last_name: v['APELLIDOS'] || '',
                 document_number: v['No DE CÉDULA SIN PUNTOS'] || '',
+                is_invalid_cc: parseBoolean(v['INVALIDA']),
                 phone: v['TELÉFONO'],
                 address: v['DIRECCIÓN DE RESIDENCIA'],
                 neighborhood: v['BARRIO DE RESIDENCIA'],
