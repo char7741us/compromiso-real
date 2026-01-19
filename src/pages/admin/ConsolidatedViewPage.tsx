@@ -3,12 +3,12 @@ import { useVoters } from '../../context/VoterContext';
 import { Search, Filter, Download } from 'lucide-react';
 import AdminHeader from '../../components/AdminHeader';
 import SkeletonLoader from '../../components/SkeletonLoader';
+import toast from 'react-hot-toast';
 
 export default function ConsolidatedViewPage() {
     const { voters, isLoading } = useVoters();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedLeader, setSelectedLeader] = useState('Todos');
-    const [exportMessage, setExportMessage] = useState('');
 
     const filteredData = useMemo(() => {
         return voters.filter(voter => {
@@ -60,8 +60,7 @@ export default function ConsolidatedViewPage() {
         link.click();
         document.body.removeChild(link);
 
-        setExportMessage('¡Exportación exitosa!');
-        setTimeout(() => setExportMessage(''), 3000);
+        toast.success('¡Exportación exitosa!');
     };
 
     if (isLoading && voters.length === 0) {
@@ -85,14 +84,6 @@ export default function ConsolidatedViewPage() {
                     </button>
                 }
             />
-
-            {exportMessage && (
-                <div className="toast toast-success consolidated-toast">
-                    <div className="flex-between gap-2">
-                        <span>{exportMessage}</span>
-                    </div>
-                </div>
-            )}
 
             <div className="card mb-2">
                 <div className="flex-wrap items-end">

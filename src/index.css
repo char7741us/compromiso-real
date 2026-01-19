@@ -2,7 +2,7 @@
 
 :root {
     /* Modern Palette - Deep Blue & Vibrant Accents */
-    --primary: #2563eb;
+    --primary: #3b82f6;
     --primary-dark: #1e40af;
     --primary-light: #60a5fa;
     --secondary: #64748b;
@@ -105,7 +105,7 @@ body {
 /* --- Cards & Containers --- */
 .card {
     background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(16px);
     border-radius: var(--radius-lg);
     border: 1px solid rgba(255, 255, 255, 0.6);
     box-shadow: var(--shadow-card);

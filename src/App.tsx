@@ -15,14 +15,20 @@ import InstructionsPage from './pages/admin/InstructionsPage';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
+import { Toaster } from 'react-hot-toast';
+import { LoadingProvider } from './context/LoadingContext';
+import GlobalLoader from './components/GlobalLoader';
 
 function App() {
     return (
-        <AuthProvider>
-            <VoterProvider>
-                <Router>
-                    <Routes>
-                        {/* Public Route */}
+        <LoadingProvider>
+            <AuthProvider>
+                <VoterProvider>
+                    <GlobalLoader />
+                    <Toaster position="top-right" />
+                    <Router>
+                        <Routes>
+                            {/* Public Route */}
                         <Route path="/login" element={<LoginPage />} />
 
                         {/* Protected Routes */}
@@ -40,12 +46,13 @@ function App() {
                             </Route>
                         </Route>
 
-                        {/* Fallback */}
-                        <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
-                    </Routes>
-                </Router>
-            </VoterProvider>
-        </AuthProvider>
+                            {/* Fallback */}
+                            <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+                        </Routes>
+                    </Router>
+                </VoterProvider>
+            </AuthProvider>
+        </LoadingProvider>
     );
 }
 

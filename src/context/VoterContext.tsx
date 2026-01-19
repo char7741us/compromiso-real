@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { supabase } from '../supabase';
+import { useLoading } from './LoadingContext';
 
 // Define the shape of a Voter record based on the CSV columns
 export interface VoterData {
@@ -26,9 +27,11 @@ const VoterContext = createContext<VoterContextType | undefined>(undefined);
 export function VoterProvider({ children }: { children: ReactNode }) {
     const [voters, setVoters] = useState<VoterData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const { startLoading, stopLoading } = useLoading();
 
     const refreshVoters = async () => {
         setIsLoading(true);
+        startLoading();
         try {
             // Fetch voters from Supabase
             // Limit to 10000 to ensure mostly all voters are loaded for local verification
@@ -73,6 +76,7 @@ export function VoterProvider({ children }: { children: ReactNode }) {
             console.error("Unexpected error fetching voters:", err);
         } finally {
             setIsLoading(false);
+            stopLoading();
         }
     };
 

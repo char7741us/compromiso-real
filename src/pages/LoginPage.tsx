@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { SecurityGuard } from '../utils/SecurityGuard';
 import { toast } from 'react-hot-toast';
+import { useLoading } from '../context/LoadingContext';
 
 const LoginPage: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -10,6 +11,7 @@ const LoginPage: React.FC = () => {
     const [honeypot, setHoneypot] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const navigate = useNavigate();
+    const { startLoading, stopLoading } = useLoading();
 
     // Check if already logged in
     useEffect(() => {
@@ -35,6 +37,7 @@ const LoginPage: React.FC = () => {
         }
 
         setIsSubmitting(true);
+        startLoading();
 
         // Layer 3: Sanitization
         const sanitizedEmail = SecurityGuard.sanitize(email);
@@ -55,6 +58,7 @@ const LoginPage: React.FC = () => {
             toast.error(error.message || 'Error al iniciar sesión');
         } finally {
             setIsSubmitting(false);
+            stopLoading();
         }
     };
 

@@ -58,7 +58,7 @@ export default function Layout() {
                         <span>Cerrar Sesión</span>
                     </button>
                     <div className="sidebar-version">
-                        v1.0.0
+                        v2.0
                     </div>
                 </div>
             </aside>
