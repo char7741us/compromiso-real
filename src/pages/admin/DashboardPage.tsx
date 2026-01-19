@@ -105,6 +105,18 @@ export default function DashboardPage() {
                         <p className="kpi-label">Registros Incompletos</p>
                     </div>
                 </div>
+
+                <div className="card kpi-card kpi-danger" style={{ cursor: 'pointer' }} onClick={() => window.location.href = '/admin/missing-data?filter=invalid_cc'}>
+                    <div className="kpi-icon icon-danger">
+                        <AlertTriangle size={32} />
+                    </div>
+                    <div>
+                        <h3 className="kpi-value">
+                            {isLoading ? <span className="opacity-60">...</span> : stats.invalidIds}
+                        </h3>
+                        <p className="kpi-label">Cédulas Erróneas</p>
+                    </div>
+                </div>
             </div>
 
             {/* CHARTS ROW */}
@@ -186,4 +198,3 @@ export default function DashboardPage() {
         </div>
     );
 }
-

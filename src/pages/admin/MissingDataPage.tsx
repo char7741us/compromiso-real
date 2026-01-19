@@ -1,42 +1,38 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useVoters, type VoterData } from '../../context/VoterContext';
-import { Search, CheckCircle, Save, ExternalLink, Filter } from 'lucide-react';
+import { Search, Save, ExternalLink, Filter, AlertCircle, ChevronDown, FileText } from 'lucide-react';
+import toast from 'react-hot-toast';
 import AdminHeader from '../../components/AdminHeader';
 import SkeletonLoader from '../../components/SkeletonLoader';
-
-interface ExtendedVoter extends VoterData {
-    _originalIndex: number;
-    _missingFields: string[];
-}
+import { generateInvalidCCReport } from '../../utils/reportUtils';
 
 export default function MissingDataPage() {
     const { voters, setVoters, updateVoter, isLoading } = useVoters();
-    const [filter, setFilter] = useState('all'); // all, phone, address, voting_post
+    const [searchParams] = useSearchParams();
+    const [filter, setFilter] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedLeader, setSelectedLeader] = useState('all');
-    const [showSuccess, setShowSuccess] = useState(false);
+    const [visibleCount, setVisibleCount] = useState(50);
 
-    // Whitelist to keep rows visible even after they are fixed, until manual refresh
-    const [visibleIds, setVisibleIds] = useState<Set<string>>(new Set());
-    const [isInitialized, setIsInitialized] = useState(false);
-
-    // Initialize visible IDs once data is loaded
+    // Auto-expand list when filtering by leader to check all
     useEffect(() => {
-        if (!isLoading && voters.length > 0 && !isInitialized) {
-            const initialMissing = voters.filter(v => {
-                const missing = [];
-                if (!v['TELÉFONO']?.trim()) missing.push('Teléfono');
-                if (!v['DIRECCIÓN DE RESIDENCIA']?.trim()) missing.push('Dirección');
-                if (!v['PUESTO DE VOTACIÓN']?.trim() || !v['DIRECCIÓN (Pto de votación)']?.trim() || !v['MESA']?.trim() || !v['MUNICIPIO VOTACIÓN']?.trim()) missing.push('Votación');
-                return missing.length > 0;
-            }).map(v => v._id);
-
-            setVisibleIds(new Set(initialMissing));
-            setIsInitialized(true);
+        if (selectedLeader !== 'all') {
+            setVisibleCount(10000);
+        } else {
+            setVisibleCount(50);
         }
-    }, [isLoading, voters, isInitialized]);
+    }, [selectedLeader]);
 
-    if (isLoading && !isInitialized) {
+    // Check for URL params
+    useEffect(() => {
+        const urlFilter = searchParams.get('filter');
+        if (urlFilter === 'invalid_cc') {
+            setFilter('invalid_cc');
+        }
+    }, [searchParams]);
+
+    if (isLoading) {
         return (
             <div style={{ padding: '20px' }}>
                 <SkeletonLoader type="text" count={2} />
@@ -45,48 +41,31 @@ export default function MissingDataPage() {
         );
     }
 
-    // Identify rows to show
-    const incompleteVoters: ExtendedVoter[] = voters
-        .filter(v => visibleIds.has(v._id))
-        .map((v, index) => {
-            const missing: string[] = [];
-            if (!v['TELÉFONO']?.trim()) missing.push('Teléfono');
-            if (!v['DIRECCIÓN DE RESIDENCIA']?.trim()) missing.push('Dirección');
-            if (!v['PUESTO DE VOTACIÓN']?.trim() || !v['DIRECCIÓN (Pto de votación)']?.trim() || !v['MESA']?.trim() || !v['MUNICIPIO VOTACIÓN']?.trim()) {
-                if (!v['PUESTO DE VOTACIÓN']?.trim()) {
-                    missing.push('Puesto Votación');
-                } else {
-                    missing.push('Datos Votación Inc.');
-                }
-            }
-
-            return {
-                ...v,
-                _originalIndex: index,
-                _missingFields: missing
-            };
-        });
-
-    // Filter and Search
-    const filteredVoters = incompleteVoters.filter(v => {
+    // Filter and Search logic
+    const filteredVoters = voters.filter(v => {
+        // Leader Filter
         if (selectedLeader !== 'all' && v['LÍDER'] !== selectedLeader) return false;
-        if (filter === 'phone' && !v._missingFields.includes('Teléfono') && v._missingFields.length > 0) return false;
-        if (filter === 'address' && !v._missingFields.includes('Dirección') && v._missingFields.length > 0) return false;
-        if (filter === 'voting_post' && !v._missingFields.includes('Puesto Votación') && v._missingFields.length > 0) return false;
 
+        // Custom Data Filters
+        if (filter === 'phone' && v['TELÉFONO']?.trim()) return false;
+        if (filter === 'address' && v['DIRECCIÓN DE RESIDENCIA']?.trim()) return false;
+        if (filter === 'voting_post' && (v['PUESTO DE VOTACIÓN']?.trim() && v['MESA']?.trim())) return false;
+        if (filter === 'invalid_cc' && !v['INVALIDA']) return false;
+
+        // Search Bar
         if (searchTerm) {
             const searchLower = searchTerm.toLowerCase();
-            const name = (v['NOMBRES'] + ' ' + v['APELLIDOS']).toLowerCase();
+            const fullName = `${v['NOMBRES'] || ''} ${v['APELLIDOS'] || ''}`.toLowerCase();
             const cedula = v['No DE CÉDULA SIN PUNTOS']?.toLowerCase() || '';
-            return name.includes(searchLower) || cedula.includes(searchLower);
+            return fullName.includes(searchLower) || cedula.includes(searchLower);
         }
 
         return true;
     });
 
-    const activeLeaders = Array.from(new Set(incompleteVoters.map(v => v['LÍDER']))).filter(Boolean).sort();
+    const activeLeaders = Array.from(new Set(voters.map(v => v['LÍDER']))).filter(Boolean).sort();
 
-    const handleUpdateById = (id: string, field: string, value: string) => {
+    const handleUpdateById = (id: string, field: string, value: any) => {
         const index = voters.findIndex(v => v._id === id);
         if (index === -1) return;
 
@@ -98,46 +77,44 @@ export default function MissingDataPage() {
         setVoters(newVoters);
     };
 
-    const handleSave = async (id: string, field: string, value: string) => {
-        if (id) {
-            await updateVoter(id, { [field]: value });
+    const handleManualSave = async (voter: VoterData) => {
+        try {
+            const updates: Partial<VoterData> = {
+                'No DE CÉDULA SIN PUNTOS': voter['No DE CÉDULA SIN PUNTOS'] || '',
+                'INVALIDA': voter['INVALIDA'] || false,
+                'TELÉFONO': voter['TELÉFONO'] || '',
+                'DIRECCIÓN DE RESIDENCIA': voter['DIRECCIÓN DE RESIDENCIA'] || '',
+                'MUNICIPIO VOTACIÓN': voter['MUNICIPIO VOTACIÓN'] || '',
+                'PUESTO DE VOTACIÓN': voter['PUESTO DE VOTACIÓN'] || '',
+                'DIRECCIÓN (Pto de votación)': voter['DIRECCIÓN (Pto de votación)'] || '',
+                'MESA': voter['MESA'] || ''
+            };
+
+            const result = await updateVoter(voter._id, updates);
+
+            if (result.success) {
+                toast.success(`Datos de ${voter['NOMBRES']} guardados`);
+            } else {
+                toast.error(`Error: ${result.error}`);
+            }
+        } catch (error) {
+            toast.error('Error inesperado al guardar');
+            console.error(error);
         }
     };
 
-    const handleRefreshList = () => {
-        const currentMissingIds = voters.filter(v => {
-            const missing = [];
-            if (!v['TELÉFONO']?.trim()) missing.push('Teléfono');
-            if (!v['DIRECCIÓN DE RESIDENCIA']?.trim()) missing.push('Dirección');
-            if (!v['PUESTO DE VOTACIÓN']?.trim() || !v['DIRECCIÓN (Pto de votación)']?.trim() || !v['MESA']?.trim() || !v['MUNICIPIO VOTACIÓN']?.trim()) missing.push('Votación');
-            return missing.length > 0;
-        }).map(v => v._id);
-
-        setVisibleIds(new Set(currentMissingIds));
-        setShowSuccess(true);
-        setTimeout(() => setShowSuccess(false), 3000);
+    // Pagination logic
+    const handleLoadMore = () => {
+        setVisibleCount(prev => prev + 50);
     };
+
+    const visibleVoters = filteredVoters.slice(0, visibleCount);
 
     return (
         <div>
-            {showSuccess && (
-                <div className="toast toast-success" style={{
-                    position: 'fixed', top: '20px', right: '20px', zIndex: 1000,
-                    backgroundColor: 'var(--success)', color: 'white', padding: '15px 25px',
-                    borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                    display: 'flex', alignItems: 'center', gap: '10px'
-                }}>
-                    <CheckCircle size={24} />
-                    <div>
-                        <div style={{ fontWeight: 'bold' }}>¡Lista Actualizada!</div>
-                        <div style={{ fontSize: '0.9rem' }}>Se han removido los registros completados.</div>
-                    </div>
-                </div>
-            )}
-
             <AdminHeader
-                title="Gestión de Datos Faltantes"
-                description={`Se encontraron ${incompleteVoters.length} registros con información pendiente.`}
+                title="Gestión y Corrección de Datos"
+                description={`Total de registros: ${voters.length}. Gestiona y corrige la información de todos los votantes.`}
             >
                 <div className="flex-wrap">
                     <a
@@ -150,9 +127,22 @@ export default function MissingDataPage() {
                         <ExternalLink size={18} />
                         Consultar Registraduría
                     </a>
-                    <button className="btn btn-primary" onClick={handleRefreshList}>
-                        <Save size={18} />
-                        Actualizar Lista
+                    <button
+                        className="btn"
+                        style={{ backgroundColor: '#dc2626', color: 'white', display: 'flex', alignItems: 'center', gap: '8px' }}
+                        onClick={() => {
+                            console.log('Botón clickeado. Total de votantes:', voters.length);
+                            const result = generateInvalidCCReport(voters);
+                            console.log('Resultado de generación:', result);
+                            if (!result.success) {
+                                toast.error(result.message || 'Error al generar el PDF');
+                            } else {
+                                toast.success('Informe PDF generado correctamente');
+                            }
+                        }}
+                    >
+                        <FileText size={18} />
+                        Descargar Informe de Cédulas Erróneas
                     </button>
                 </div>
             </AdminHeader>
@@ -182,7 +172,7 @@ export default function MissingDataPage() {
                                 onChange={(e) => setSelectedLeader(e.target.value)}
                             >
                                 <option value="all">Todos los Líderes</option>
-                                {activeLeaders.map(leader => (
+                                {activeLeaders.map((leader: any) => (
                                     <option key={leader} value={leader}>{leader}</option>
                                 ))}
                             </select>
@@ -190,6 +180,13 @@ export default function MissingDataPage() {
                     </div>
 
                     <div className="flex-wrap" style={{ gap: '10px' }}>
+                        <button
+                            className={`btn ${filter === 'invalid_cc' ? 'btn-danger' : 'btn-outline-danger'}`}
+                            onClick={() => setFilter(filter === 'invalid_cc' ? 'all' : 'invalid_cc')}
+                            style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+                        >
+                            <AlertCircle size={16} /> CC Inválida
+                        </button>
                         {['all', 'phone', 'address', 'voting_post'].map(type => (
                             <button
                                 key={type}
@@ -197,7 +194,7 @@ export default function MissingDataPage() {
                                 onClick={() => setFilter(type)}
                                 style={{ fontSize: '0.85rem' }}
                             >
-                                {type === 'all' ? 'Todos' : type === 'phone' ? 'Falta Tel.' : type === 'address' ? 'Falta Dir.' : 'Falta Puesto'}
+                                {type === 'all' ? 'Ver Todos' : type === 'phone' ? 'Sin Tel.' : type === 'address' ? 'Sin Dir.' : 'Sin Puesto'}
                             </button>
                         ))}
                     </div>
@@ -210,108 +207,145 @@ export default function MissingDataPage() {
                     <table>
                         <thead>
                             <tr>
-                                <th>Líder</th>
-                                <th>Votante</th>
-                                <th>Info Votación</th>
-                                <th>Pendiente</th>
-                                <th>Gestión Rápida</th>
+                                <th>Líder / Votante</th>
+                                <th>Residencia y Contacto</th>
+                                <th>Info de Votación (Registraduría)</th>
+                                <th style={{ width: '80px', textAlign: 'center' }}>Acción</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredVoters.slice(0, 50).map((v) => (
-                                <tr key={v._id}>
-                                    <td style={{ fontWeight: '600' }}>{v['LÍDER'] || 'Sin Asignar'}</td>
+                            {visibleVoters.map((v) => (
+                                <tr key={v._id} style={{ backgroundColor: v['INVALIDA'] ? '#fff1f2' : '' }}>
                                     <td>
-                                        <div style={{ fontWeight: '600' }}>{v['NOMBRES']} {v['APELLIDOS']}</div>
-                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{v['No DE CÉDULA SIN PUNTOS']}</div>
-                                    </td>
-                                    <td>
-                                        <div style={{ fontSize: '0.8rem' }}>
-                                            <div><strong>Puesto:</strong> {v['PUESTO DE VOTACIÓN'] || '-'}</div>
-                                            <div><strong>Mesa:</strong> {v['MESA'] || '-'}</div>
-                                            <div><strong>Mun:</strong> {v['MUNICIPIO VOTACIÓN'] || '-'}</div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div className="flex-wrap" style={{ gap: '5px' }}>
-                                            {v._missingFields.map(f => (
-                                                <span key={f} className="badge badge-warning" style={{ fontSize: '0.7rem' }}>{f}</span>
-                                            ))}
-                                            {v._missingFields.length === 0 && (
-                                                <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>¡Ok!</span>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '220px' }}>
-                                            {v._missingFields.includes('Teléfono') && (
+                                        <div style={{ fontWeight: '600', color: 'var(--primary)', fontSize: '0.9rem' }}>{v['LÍDER'] || 'Sin Asignar'}</div>
+                                        <div style={{ marginTop: '5px' }}>
+                                            <div style={{ fontWeight: '600', fontSize: '1rem' }}>{v['NOMBRES']} {v['APELLIDOS']}</div>
+
+                                            {/* CC Correction Area */}
+                                            <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
                                                 <div style={{ position: 'relative' }}>
+                                                    <span style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>CC.</span>
                                                     <input
                                                         type="text"
-                                                        placeholder="Teléfono"
                                                         className="search-input"
-                                                        style={{ padding: '6px 30px 6px 10px', fontSize: '0.8rem', width: '100%', borderColor: v['TELÉFONO']?.trim() ? 'var(--success)' : '' }}
-                                                        value={v['TELÉFONO'] || ''}
-                                                        onChange={(e) => handleUpdateById(v._id, 'TELÉFONO', e.target.value)}
-                                                        onBlur={(e) => handleSave(v._id, 'TELÉFONO', e.target.value)}
-                                                    />
-                                                    {v['TELÉFONO']?.trim() && <CheckCircle size={14} color="var(--success)" style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)' }} />}
-                                                </div>
-                                            )}
-                                            {v._missingFields.includes('Dirección') && (
-                                                <div style={{ position: 'relative' }}>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Dirección"
-                                                        className="search-input"
-                                                        style={{ padding: '6px 30px 6px 10px', fontSize: '0.8rem', width: '100%', borderColor: v['DIRECCIÓN DE RESIDENCIA']?.trim() ? 'var(--success)' : '' }}
-                                                        value={v['DIRECCIÓN DE RESIDENCIA'] || ''}
-                                                        onChange={(e) => handleUpdateById(v._id, 'DIRECCIÓN DE RESIDENCIA', e.target.value)}
-                                                        onBlur={(e) => handleSave(v._id, 'DIRECCIÓN DE RESIDENCIA', e.target.value)}
-                                                    />
-                                                    {v['DIRECCIÓN DE RESIDENCIA']?.trim() && <CheckCircle size={14} color="var(--success)" style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)' }} />}
-                                                </div>
-                                            )}
-                                            {(v._missingFields.includes('Puesto Votación') || v._missingFields.includes('Datos Votación Inc.')) && (
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px' }}>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Puesto"
-                                                        className="search-input"
-                                                        style={{ padding: '6px', fontSize: '0.8rem', borderColor: v['PUESTO DE VOTACIÓN']?.trim() ? 'var(--success)' : '' }}
-                                                        value={v['PUESTO DE VOTACIÓN'] || ''}
-                                                        onChange={(e) => handleUpdateById(v._id, 'PUESTO DE VOTACIÓN', e.target.value)}
-                                                        onBlur={(e) => handleSave(v._id, 'PUESTO DE VOTACIÓN', e.target.value)}
-                                                    />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Mesa"
-                                                        className="search-input"
-                                                        style={{ padding: '6px', fontSize: '0.8rem', borderColor: v['MESA']?.trim() ? 'var(--success)' : '' }}
-                                                        value={v['MESA'] || ''}
-                                                        onChange={(e) => handleUpdateById(v._id, 'MESA', e.target.value)}
-                                                        onBlur={(e) => handleSave(v._id, 'MESA', e.target.value)}
+                                                        style={{ padding: '4px 8px 4px 28px', fontSize: '0.85rem', width: '100%', fontWeight: '600' }}
+                                                        value={v['No DE CÉDULA SIN PUNTOS'] || ''}
+                                                        onChange={(e) => handleUpdateById(v._id, 'No DE CÉDULA SIN PUNTOS', e.target.value)}
                                                     />
                                                 </div>
-                                            )}
+                                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', cursor: 'pointer', color: v['INVALIDA'] ? 'var(--danger)' : 'var(--text-muted)' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        style={{ width: '16px', height: '16px' }}
+                                                        checked={v['INVALIDA'] || false}
+                                                        onChange={(e) => handleUpdateById(v._id, 'INVALIDA', e.target.checked)}
+                                                    />
+                                                    <strong>Cédula Inválida</strong>
+                                                </label>
+                                            </div>
                                         </div>
+                                    </td>
+                                    <td>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                            <div style={{ position: 'relative' }}>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Teléfono"
+                                                    className="search-input"
+                                                    style={{ padding: '6px 10px', fontSize: '0.8rem', width: '100%' }}
+                                                    value={v['TELÉFONO'] || ''}
+                                                    onChange={(e) => handleUpdateById(v._id, 'TELÉFONO', e.target.value)}
+                                                />
+                                            </div>
+                                            <div style={{ position: 'relative' }}>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Dirección Residencia"
+                                                    className="search-input"
+                                                    style={{ padding: '6px 10px', fontSize: '0.8rem', width: '100%' }}
+                                                    value={v['DIRECCIÓN DE RESIDENCIA'] || ''}
+                                                    onChange={(e) => handleUpdateById(v._id, 'DIRECCIÓN DE RESIDENCIA', e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px' }}>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Municipio"
+                                                    className="search-input"
+                                                    style={{ padding: '6px', fontSize: '0.8rem' }}
+                                                    value={v['MUNICIPIO VOTACIÓN'] || ''}
+                                                    onChange={(e) => handleUpdateById(v._id, 'MUNICIPIO VOTACIÓN', e.target.value)}
+                                                />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Puesto de Votación"
+                                                    className="search-input"
+                                                    style={{ padding: '6px', fontSize: '0.8rem' }}
+                                                    value={v['PUESTO DE VOTACIÓN'] || ''}
+                                                    onChange={(e) => handleUpdateById(v._id, 'PUESTO DE VOTACIÓN', e.target.value)}
+                                                />
+                                            </div>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '5px' }}>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Dirección Puesto"
+                                                    className="search-input"
+                                                    style={{ padding: '6px', fontSize: '0.8rem' }}
+                                                    value={v['DIRECCIÓN (Pto de votación)'] || ''}
+                                                    onChange={(e) => handleUpdateById(v._id, 'DIRECCIÓN (Pto de votación)', e.target.value)}
+                                                />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Mesa"
+                                                    className="search-input"
+                                                    style={{ padding: '6px', fontSize: '0.8rem' }}
+                                                    value={v['MESA'] || ''}
+                                                    onChange={(e) => handleUpdateById(v._id, 'MESA', e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td style={{ verticalAlign: 'middle', textAlign: 'center' }}>
+                                        <button
+                                            className="btn btn-primary"
+                                            style={{ width: '100%', padding: '10px 5px', display: 'flex', justifyContent: 'center' }}
+                                            onClick={() => handleManualSave(v)}
+                                            title="Guardar Cambios"
+                                        >
+                                            <Save size={18} />
+                                        </button>
                                     </td>
                                 </tr>
                             ))}
-                            {filteredVoters.length === 0 && (
-                                <tr>
-                                    <td colSpan={5} style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
-                                        <CheckCircle size={48} color="var(--success)" style={{ margin: '0 auto 15px', display: 'block' }} />
-                                        <p style={{ fontSize: '1.2rem', fontWeight: '500' }}>¡Todo al día!</p>
-                                        <p>No se encontraron registros pendientes con los filtros actuales.</p>
-                                    </td>
-                                </tr>
-                            )}
                         </tbody>
                     </table>
                 </div>
-                {filteredVoters.length > 50 && (
-                    <p className="preview-footer">Mostrando los primeros 50 registros de {filteredVoters.length}.</p>
+
+                {filteredVoters.length === 0 && !isLoading && (
+                    <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                        No se encontraron registros que coincidan con la búsqueda.
+                    </div>
+                )}
+
+                {/* LOAD MORE BUTTON */}
+                {filteredVoters.length > visibleCount && (
+                    <div style={{ textAlign: 'center', padding: '20px', borderTop: '1px solid var(--border-color)' }}>
+                        <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '10px' }}>
+                            Mostrando {visibleCount} de {filteredVoters.length} registros
+                        </p>
+                        <button
+                            className="btn btn-secondary"
+                            onClick={handleLoadMore}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                        >
+                            <ChevronDown size={20} />
+                            Cargar más resultados
+                        </button>
+                    </div>
                 )}
             </div>
         </div>

@@ -9,7 +9,7 @@ export interface VoterData {
 interface VoterContextType {
     voters: VoterData[];
     setVoters: (data: VoterData[]) => void;
-    updateVoter: (id: string, updates: Partial<VoterData>) => Promise<void>;
+    updateVoter: (id: string, updates: Partial<VoterData>) => Promise<{ success: boolean; error?: string }>;
     refreshVoters: () => Promise<void>;
     isLoading: boolean;
     stats: {
@@ -17,6 +17,7 @@ interface VoterContextType {
         missingPhone: number;
         missingAddress: number;
         missingVotingPost: number;
+        invalidIds: number;
     };
 }
 
@@ -30,7 +31,7 @@ export function VoterProvider({ children }: { children: ReactNode }) {
         setIsLoading(true);
         try {
             // Fetch voters from Supabase
-            // Limit to 1000 for performance prototype, or implement pagination later
+            // Limit to 10000 to ensure mostly all voters are loaded for local verification
             const { data, error } = await supabase
                 .from('voters')
                 .select(`
@@ -40,7 +41,7 @@ export function VoterProvider({ children }: { children: ReactNode }) {
                     )
                 `)
                 .order('created_at', { ascending: false })
-                .limit(2000);
+                .limit(10000);
 
             if (error) {
                 console.error("Error fetching voters:", error);
@@ -49,9 +50,10 @@ export function VoterProvider({ children }: { children: ReactNode }) {
 
             if (data) {
                 // Map DB columns back to UI expected keys (CSV headers) for compatibility
-                const mappedData: VoterData[] = data.map(row => ({
+                const mappedData: VoterData[] = data.map((row: any) => ({
                     ...row,
-                    'LÍDER': row.leaders?.full_name || '',
+                    'LÍDER': row.leaders?.full_name || 'Sin Asignar',
+                    leader_name: row.leaders?.full_name || 'Sin Asignar',
                     'NOMBRES': row.first_name,
                     'APELLIDOS': row.last_name,
                     'No DE CÉDULA SIN PUNTOS': row.document_number,
@@ -62,7 +64,7 @@ export function VoterProvider({ children }: { children: ReactNode }) {
                     'DIRECCIÓN (Pto de votación)': row.voting_post_address,
                     'MESA': row.voting_table,
                     'MUNICIPIO VOTACIÓN': row.voting_municipality,
-                    // Keep original DB fields too if needed
+                    'INVALIDA': row.is_invalid_cc, // MAPPED FROM DB
                     _id: row.id
                 }));
                 setVoters(mappedData);
@@ -75,14 +77,15 @@ export function VoterProvider({ children }: { children: ReactNode }) {
     };
 
     // Update locally and in Supabase
-    const updateVoter = async (id: string, updates: Partial<VoterData>) => {
+    const updateVoter = async (id: string, updates: Partial<VoterData>): Promise<{ success: boolean; error?: string }> => {
+        console.log("updateVoter called for:", id, "with updates:", updates);
+
         // 1. Optimistic Update
         setVoters(prev => prev.map(v =>
             v._id === id ? { ...v, ...updates } : v
         ));
 
         // 2. Persist to Supabase
-        // Map UI keys back to DB columns if necessary
         const dbUpdates: any = {};
         if (updates['TELÉFONO'] !== undefined) dbUpdates.phone = updates['TELÉFONO'];
         if (updates['DIRECCIÓN DE RESIDENCIA'] !== undefined) dbUpdates.address = updates['DIRECCIÓN DE RESIDENCIA'];
@@ -90,6 +93,12 @@ export function VoterProvider({ children }: { children: ReactNode }) {
         if (updates['DIRECCIÓN (Pto de votación)'] !== undefined) dbUpdates.voting_post_address = updates['DIRECCIÓN (Pto de votación)'];
         if (updates['MESA'] !== undefined) dbUpdates.voting_table = updates['MESA'];
         if (updates['MUNICIPIO VOTACIÓN'] !== undefined) dbUpdates.voting_municipality = updates['MUNICIPIO VOTACIÓN'];
+
+        // Fix for Invalid CC and Document Number
+        if (updates['INVALIDA'] !== undefined) dbUpdates.is_invalid_cc = updates['INVALIDA'];
+        if (updates['No DE CÉDULA SIN PUNTOS'] !== undefined) dbUpdates.document_number = updates['No DE CÉDULA SIN PUNTOS'];
+
+        console.log("Sending to Supabase:", dbUpdates);
 
         if (Object.keys(dbUpdates).length > 0) {
             try {
@@ -100,15 +109,40 @@ export function VoterProvider({ children }: { children: ReactNode }) {
 
                 if (error) {
                     console.error("Error updating voter in DB:", error);
-                    // Optionally revert optimistic update here
+                    return { success: false, error: error.message };
+                } else {
+                    console.log("Supabase update successful");
+                    return { success: true };
                 }
-            } catch (err) {
+            } catch (err: any) {
                 console.error("Unexpected error updating voter:", err);
+                return { success: false, error: err?.message || "Unknown error" };
             }
+        } else {
+            console.warn("No valid DB updates found to send.");
+            return { success: true }; // Nothing to update is essentially a success
         }
     };
+
     useEffect(() => {
         refreshVoters();
+
+        // Real-time subscription
+        const channel = supabase
+            .channel('public:voters')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'voters' },
+                (payload) => {
+                    console.log('Real-time change detected:', payload);
+                    refreshVoters();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
 
     // Calculate quick stats derived from the data
@@ -117,6 +151,7 @@ export function VoterProvider({ children }: { children: ReactNode }) {
         missingPhone: voters.filter(v => !v['TELÉFONO']?.trim()).length,
         missingAddress: voters.filter(v => !v['DIRECCIÓN DE RESIDENCIA']?.trim()).length,
         missingVotingPost: voters.filter(v => !v['PUESTO DE VOTACIÓN']?.trim()).length,
+        invalidIds: voters.filter(v => v['INVALIDA']).length,
     };
 
     return (

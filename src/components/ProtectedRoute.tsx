@@ -16,7 +16,11 @@ const ProtectedRoute: React.FC = () => {
         );
     }
 
-    if (!session) {
+    // Allow access if session exists OR if we are in localhost (dev mode)
+    // This allows editing without logging in locally.
+    const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+    if (!session && !isDev) {
         return <Navigate to="/login" replace />;
     }
 

@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import ImportPage from './pages/admin/ImportPage';
+import LeadersPage from './pages/admin/LeadersPage';
 import { VoterProvider } from './context/VoterContext';
 
 import DashboardPage from './pages/admin/DashboardPage';
@@ -9,6 +10,7 @@ import MissingDataPage from './pages/admin/MissingDataPage';
 import AnalysisPage from './pages/admin/AnalysisPage';
 import ConsolidatedViewPage from './pages/admin/ConsolidatedViewPage';
 import MapPage from './pages/admin/MapPage';
+import InstructionsPage from './pages/admin/InstructionsPage';
 
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -30,9 +32,11 @@ function App() {
                                 <Route path="admin/dashboard" element={<DashboardPage />} />
                                 <Route path="admin/import" element={<ImportPage />} />
                                 <Route path="admin/consolidated" element={<ConsolidatedViewPage />} />
+                                <Route path="admin/leaders" element={<LeadersPage />} />
                                 <Route path="admin/missing-data" element={<MissingDataPage />} />
                                 <Route path="map" element={<MapPage />} />
                                 <Route path="analysis" element={<AnalysisPage />} />
+                                <Route path="admin/instructions" element={<InstructionsPage />} />
                             </Route>
                         </Route>
 

@@ -1,4 +1,4 @@
-import { LayoutDashboard, Upload, Map as MapIcon, AlertCircle, BarChart3, ListChecks, LogOut } from 'lucide-react';
+import { LayoutDashboard, Upload, Map as MapIcon, AlertCircle, BarChart3, ListChecks, LogOut, Users, BookOpen } from 'lucide-react';
 import { supabase } from '../supabase';
 import { NavLink, Outlet } from 'react-router-dom';
 import PlatformLogo from '../assets/logo-compromiso-sidebar.png';
@@ -7,9 +7,9 @@ export default function Layout() {
     return (
         <div className="app-layout">
             <aside className="sidebar">
-                <div className="flex flex-col items-center gap-2 px-2" style={{ marginBottom: '2rem', textAlign: 'center' }}>
-                    <img src={PlatformLogo} alt="Logo" style={{ height: '140px', width: 'auto' }} />
-                    <h1 style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--primary-dark)' }}>Compromiso Real</h1>
+                <div className="sidebar-header">
+                    <img src={PlatformLogo} alt="Logo" className="sidebar-logo" />
+                    <h1 className="sidebar-title">Compromiso Real</h1>
                 </div>
 
                 <nav className="sidebar-nav">
@@ -20,6 +20,10 @@ export default function Layout() {
                     <NavLink to="/admin/import" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
                         <Upload size={20} />
                         <span>Importar Datos</span>
+                    </NavLink>
+                    <NavLink to="/admin/leaders" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                        <Users size={20} />
+                        <span>Gestión Líderes</span>
                     </NavLink>
                     <NavLink to="/admin/consolidated" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
                         <ListChecks size={20} />
@@ -37,20 +41,23 @@ export default function Layout() {
                         <BarChart3 size={20} />
                         <span>Análisis Líderes</span>
                     </NavLink>
+                    <NavLink to="/admin/instructions" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                        <BookOpen size={20} />
+                        <span>Instructivo</span>
+                    </NavLink>
                 </nav>
 
-                <div style={{ marginTop: 'auto', padding: '1rem', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
+                <div className="sidebar-footer">
                     <button
                         onClick={() => {
                             supabase.auth.signOut().then(() => window.location.href = '/login');
                         }}
-                        className="nav-item flex items-center gap-3 w-full"
-                        style={{ border: 'none', background: 'none', cursor: 'pointer', width: '100%' }}
+                        className="nav-item flex items-center gap-3 w-full sidebar-logout"
                     >
                         <LogOut size={20} />
                         <span>Cerrar Sesión</span>
                     </button>
-                    <div style={{ marginTop: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    <div className="sidebar-version">
                         v1.0.0
                     </div>
                 </div>

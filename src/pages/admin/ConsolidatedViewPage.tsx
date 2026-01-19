@@ -24,7 +24,9 @@ export default function ConsolidatedViewPage() {
     const leaders = useMemo(() => {
         const uniqueLeaders = new Set<string>();
         voters.forEach(v => {
-            if (v.leader_name) uniqueLeaders.add(v.leader_name);
+            // Use the explicit leader_name property we added to context
+            const name = v.leader_name || v['LÍDER'] || 'Sin Asignar';
+            uniqueLeaders.add(name);
         });
         return Array.from(uniqueLeaders);
     }, [voters]);

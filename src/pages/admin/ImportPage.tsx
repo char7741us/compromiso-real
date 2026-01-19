@@ -57,13 +57,13 @@ export default function ImportPage() {
                         headerMap[colName.toUpperCase()] = idx;
                     });
 
-                    missingColumns = EXPECTED_COLUMNS.filter(col => headerMap[col] === undefined);
+                    missingColumns = EXPECTED_COLUMNS.filter(col => headerMap[col.toUpperCase()] === undefined);
 
                     if (missingColumns.length === 0) {
                         formattedData = rows.slice(1).map(row => {
                             const obj: VoterData = {};
                             EXPECTED_COLUMNS.forEach(col => {
-                                obj[col] = row[headerMap[col]]?.trim() || '';
+                                obj[col] = row[headerMap[col.toUpperCase()]]?.trim() || '';
                             });
                             return obj;
                         });
