@@ -6,6 +6,7 @@ import requests
 import json
 import random
 import plotly.express as px
+import numpy as np
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(
@@ -131,8 +132,8 @@ def simulate_geocoding(df):
     """
     if 'LATITUD' not in df.columns:
         # Generar coordenadas aleatorias cerca a Barranquilla para demo
-        df['LATITUD'] = df.apply(lambda x: 10.96 + random.uniform(-0.05, 0.05), axis=1)
-        df['LONGITUD'] = df.apply(lambda x: -74.80 + random.uniform(-0.05, 0.05), axis=1)
+        df['LATITUD'] = 10.96 + np.random.uniform(-0.05, 0.05, size=len(df))
+        df['LONGITUD'] = -74.80 + np.random.uniform(-0.05, 0.05, size=len(df))
     return df
 
 def send_to_n8n(webhook_url, data_payload):
