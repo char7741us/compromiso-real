@@ -1,95 +1,145 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 import { supabase } from '../supabase';
 import { useLoading } from './LoadingContext';
 
-// Define the shape of a Voter record based on the CSV columns
 export interface VoterData {
     [key: string]: any;
 }
 
+export interface FetchVotersParams {
+    page?: number;
+    pageSize?: number;
+    filters?: Record<string, any>;
+    search?: string;
+    sort?: { column: string; ascending: boolean };
+}
+
+interface VoterStats {
+    total: number;
+    missingPhone: number;
+    missingAddress: number;
+    missingVotingPost: number;
+    invalidIds: number;
+}
+
 interface VoterContextType {
+    // Deprecated but kept for type compatibility
     voters: VoterData[];
     setVoters: (data: VoterData[]) => void;
+
     updateVoter: (id: string, updates: Partial<VoterData>) => Promise<{ success: boolean; error?: string }>;
+    fetchGlobalStats: () => Promise<void>;
+    fetchVoters: (params: FetchVotersParams) => Promise<{ data: VoterData[], count: number }>;
     refreshVoters: () => Promise<void>;
+
     isLoading: boolean;
-    stats: {
-        total: number;
-        missingPhone: number;
-        missingAddress: number;
-        missingVotingPost: number;
-        invalidIds: number;
-    };
+    stats: VoterStats;
 }
 
 const VoterContext = createContext<VoterContextType | undefined>(undefined);
 
 export function VoterProvider({ children }: { children: ReactNode }) {
     const [voters, setVoters] = useState<VoterData[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
+    const [stats, setStats] = useState<VoterStats>({
+        total: 0,
+        missingPhone: 0,
+        missingAddress: 0,
+        missingVotingPost: 0,
+        invalidIds: 0
+    });
+
     const { startLoading, stopLoading } = useLoading();
 
-    const refreshVoters = async () => {
+    const fetchGlobalStats = async () => {
+        try {
+            const [
+                { count: total },
+                { count: missingPhone },
+                { count: missingAddress },
+                { count: missingVotingPost },
+                { count: invalidIds }
+            ] = await Promise.all([
+                supabase.from('voters').select('*', { count: 'exact', head: true }),
+                supabase.from('voters').select('*', { count: 'exact', head: true }).or('phone.is.null,phone.eq.""'),
+                supabase.from('voters').select('*', { count: 'exact', head: true }).or('address.is.null,address.eq.""'),
+                supabase.from('voters').select('*', { count: 'exact', head: true }).or('voting_post.is.null,voting_post.eq.""'),
+                supabase.from('voters').select('*', { count: 'exact', head: true }).eq('is_invalid_cc', true)
+            ]);
+
+            setStats({
+                total: total || 0,
+                missingPhone: missingPhone || 0,
+                missingAddress: missingAddress || 0,
+                missingVotingPost: missingVotingPost || 0,
+                invalidIds: invalidIds || 0
+            });
+        } catch (error) {
+            console.error("Error fetching stats:", error);
+        }
+    };
+
+    const fetchVoters = async ({ page = 1, pageSize = 50, filters = {}, search = '', sort = { column: 'created_at', ascending: false } }: FetchVotersParams) => {
         setIsLoading(true);
         startLoading();
         try {
-            // Fetch voters from Supabase
-            // Limit to 10000 to ensure mostly all voters are loaded for local verification
-            const { data, error } = await supabase
+            let query = supabase
                 .from('voters')
                 .select(`
                     *,
-                    leaders (
-                        full_name
-                    )
-                `)
-                .order('created_at', { ascending: false })
-                .limit(10000);
+                    leaders ( full_name )
+                `, { count: 'exact' });
 
-            if (error) {
-                console.error("Error fetching voters:", error);
-                return;
+            if (search) {
+                query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,document_number.ilike.%${search}%`);
             }
 
-            if (data) {
-                // Map DB columns back to UI expected keys (CSV headers) for compatibility
-                const mappedData: VoterData[] = data.map((row: any) => ({
-                    ...row,
-                    'LÍDER': row.leaders?.full_name || 'Sin Asignar',
-                    leader_name: row.leaders?.full_name || 'Sin Asignar',
-                    'NOMBRES': row.first_name,
-                    'APELLIDOS': row.last_name,
-                    'No DE CÉDULA SIN PUNTOS': row.document_number,
-                    'TELÉFONO': row.phone,
-                    'DIRECCIÓN DE RESIDENCIA': row.address,
-                    'BARRIO DE RESIDENCIA': row.neighborhood,
-                    'PUESTO DE VOTACIÓN': row.voting_post,
-                    'DIRECCIÓN (Pto de votación)': row.voting_post_address,
-                    'MESA': row.voting_table,
-                    'MUNICIPIO VOTACIÓN': row.voting_municipality,
-                    'INVALIDA': row.is_invalid_cc, // MAPPED FROM DB
-                    _id: row.id
-                }));
-                setVoters(mappedData);
-            }
-        } catch (err) {
-            console.error("Unexpected error fetching voters:", err);
+            Object.entries(filters).forEach(([key, value]) => {
+                if (value !== undefined && value !== null && value !== 'all') {
+                     // Handle basic filters
+                     query = query.eq(key, value);
+                }
+            });
+
+            const from = (page - 1) * pageSize;
+            const to = from + pageSize - 1;
+            query = query.range(from, to);
+            query = query.order(sort.column, { ascending: sort.ascending });
+
+            const { data, count, error } = await query;
+
+            if (error) throw error;
+
+            const mappedData: VoterData[] = (data || []).map((row: any) => ({
+                ...row,
+                'LÍDER': row.leaders?.full_name || 'Sin Asignar',
+                leader_name: row.leaders?.full_name || 'Sin Asignar',
+                'NOMBRES': row.first_name,
+                'APELLIDOS': row.last_name,
+                'No DE CÉDULA SIN PUNTOS': row.document_number,
+                'TELÉFONO': row.phone,
+                'DIRECCIÓN DE RESIDENCIA': row.address,
+                'BARRIO DE RESIDENCIA': row.neighborhood,
+                'PUESTO DE VOTACIÓN': row.voting_post,
+                'DIRECCIÓN (Pto de votación)': row.voting_post_address,
+                'MESA': row.voting_table,
+                'MUNICIPIO VOTACIÓN': row.voting_municipality,
+                'INVALIDA': row.is_invalid_cc,
+                _id: row.id
+            }));
+
+            return { data: mappedData, count: count || 0 };
+
+        } catch (error) {
+            console.error("Error fetching voters:", error);
+            return { data: [], count: 0 };
         } finally {
             setIsLoading(false);
             stopLoading();
         }
     };
 
-    // Update locally and in Supabase
     const updateVoter = async (id: string, updates: Partial<VoterData>): Promise<{ success: boolean; error?: string }> => {
-        console.log("updateVoter called for:", id, "with updates:", updates);
-
-        // 1. Optimistic Update
-        setVoters(prev => prev.map(v =>
-            v._id === id ? { ...v, ...updates } : v
-        ));
-
-        // 2. Persist to Supabase
         const dbUpdates: any = {};
         if (updates['TELÉFONO'] !== undefined) dbUpdates.phone = updates['TELÉFONO'];
         if (updates['DIRECCIÓN DE RESIDENCIA'] !== undefined) dbUpdates.address = updates['DIRECCIÓN DE RESIDENCIA'];
@@ -97,69 +147,28 @@ export function VoterProvider({ children }: { children: ReactNode }) {
         if (updates['DIRECCIÓN (Pto de votación)'] !== undefined) dbUpdates.voting_post_address = updates['DIRECCIÓN (Pto de votación)'];
         if (updates['MESA'] !== undefined) dbUpdates.voting_table = updates['MESA'];
         if (updates['MUNICIPIO VOTACIÓN'] !== undefined) dbUpdates.voting_municipality = updates['MUNICIPIO VOTACIÓN'];
-
-        // Fix for Invalid CC and Document Number
         if (updates['INVALIDA'] !== undefined) dbUpdates.is_invalid_cc = updates['INVALIDA'];
         if (updates['No DE CÉDULA SIN PUNTOS'] !== undefined) dbUpdates.document_number = updates['No DE CÉDULA SIN PUNTOS'];
 
-        console.log("Sending to Supabase:", dbUpdates);
-
         if (Object.keys(dbUpdates).length > 0) {
             try {
-                const { error } = await supabase
-                    .from('voters')
-                    .update(dbUpdates)
-                    .eq('id', id);
-
-                if (error) {
-                    console.error("Error updating voter in DB:", error);
-                    return { success: false, error: error.message };
-                } else {
-                    console.log("Supabase update successful");
-                    return { success: true };
-                }
+                const { error } = await supabase.from('voters').update(dbUpdates).eq('id', id);
+                if (error) return { success: false, error: error.message };
+                fetchGlobalStats();
+                return { success: true };
             } catch (err: any) {
-                console.error("Unexpected error updating voter:", err);
                 return { success: false, error: err?.message || "Unknown error" };
             }
-        } else {
-            console.warn("No valid DB updates found to send.");
-            return { success: true }; // Nothing to update is essentially a success
         }
+        return { success: true };
     };
 
-    useEffect(() => {
-        refreshVoters();
-
-        // Real-time subscription
-        const channel = supabase
-            .channel('public:voters')
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'voters' },
-                (payload) => {
-                    console.log('Real-time change detected:', payload);
-                    refreshVoters();
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, []);
-
-    // Calculate quick stats derived from the data
-    const stats = {
-        total: voters.length,
-        missingPhone: voters.filter(v => !v['TELÉFONO']?.trim()).length,
-        missingAddress: voters.filter(v => !v['DIRECCIÓN DE RESIDENCIA']?.trim()).length,
-        missingVotingPost: voters.filter(v => !v['PUESTO DE VOTACIÓN']?.trim()).length,
-        invalidIds: voters.filter(v => v['INVALIDA']).length,
+    const refreshVoters = async () => {
+        await fetchGlobalStats();
     };
 
     return (
-        <VoterContext.Provider value={{ voters, setVoters, stats, refreshVoters, isLoading, updateVoter }}>
+        <VoterContext.Provider value={{ voters, setVoters, stats, refreshVoters, isLoading, updateVoter, fetchVoters, fetchGlobalStats }}>
             {children}
         </VoterContext.Provider>
     );
