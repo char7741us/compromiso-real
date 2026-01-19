@@ -26,19 +26,23 @@ export default function DashboardPage() {
         return new Set(voters.map(v => v['LÍDER']?.trim()).filter(Boolean)).size;
     }, [voters]);
 
-    // 2. Data Quality (Pie Chart)
+    // 2. Data Quality (Pie Chart) - Exact Calculation
     const dataQuality = useMemo(() => {
-        const total = stats.total;
-        if (total === 0) return [];
-        const missingOne = stats.missingPhone + stats.missingAddress + stats.missingVotingPost;
-        const complete = Math.max(0, total - (missingOne / 3)); // Aproximación
-        const incomplete = total - complete;
+        if (voters.length === 0) return [];
+
+        const complete = voters.filter(v =>
+            v['TELÉFONO']?.trim() &&
+            v['DIRECCIÓN DE RESIDENCIA']?.trim() &&
+            v['PUESTO DE VOTACIÓN']?.trim()
+        ).length;
+
+        const incomplete = voters.length - complete;
 
         return [
-            { name: 'Datos Completos', value: Math.round(complete), color: '#10b981' }, // Emerald
-            { name: 'Por Completar', value: Math.round(incomplete), color: '#f59e0b' }, // Amber
+            { name: 'Datos Completos', value: complete, color: '#10b981' }, // Emerald
+            { name: 'Por Completar', value: incomplete, color: '#f59e0b' }, // Amber
         ];
-    }, [stats]);
+    }, [voters]);
 
     // 3. Top Leaders Management (Bar Chart)
     const topLeaders = useMemo(() => {
@@ -241,15 +245,15 @@ export default function DashboardPage() {
                     </div>
 
                     {/* 2. ZONE DISTRIBUTION */}
-                    <div className="card p-5 h-[400px]">
+                    <div className="card p-5 h-[450px] lg:h-[400px] flex flex-col">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
                                 <MapPin size={20} className="text-teal-600" /> Distribución por Zonas
                             </h3>
                             <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded">Top 8</span>
                         </div>
-                        <div className="flex">
-                            <div className="w-2/3 h-[300px]">
+                        <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
+                            <div className="w-full lg:w-2/3 h-[250px] lg:h-full">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
                                         <Pie
@@ -269,10 +273,10 @@ export default function DashboardPage() {
                                     </PieChart>
                                 </ResponsiveContainer>
                             </div>
-                            <div className="w-1/3 flex flex-col justify-center gap-2 text-xs overflow-y-auto max-h-[300px] custom-scrollbar">
+                            <div className="w-full lg:w-1/3 flex flex-row lg:flex-col flex-wrap lg:flex-nowrap justify-center content-start lg:content-center gap-2 text-xs overflow-y-auto max-h-[100px] lg:max-h-full custom-scrollbar p-2">
                                 {zoneStats.map((z, i) => (
-                                    <div key={i} className="flex items-center gap-2">
-                                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }}></div>
+                                    <div key={i} className="flex items-center gap-2 w-[45%] lg:w-full">
+                                        <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }}></div>
                                         <span className="text-slate-600 truncate flex-1" title={z.name}>{z.name}</span>
                                         <span className="font-bold text-slate-800">{z.value}</span>
                                     </div>
