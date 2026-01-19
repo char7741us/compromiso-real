@@ -8,6 +8,7 @@ import {
 import InfographicImage from '../../assets/infographic-stats.jpg';
 import AdminHeader from '../../components/AdminHeader';
 import SkeletonLoader from '../../components/SkeletonLoader';
+import toast from 'react-hot-toast';
 
 export default function DashboardPage() {
     const { stats, voters, isLoading, refreshVoters } = useVoters();
@@ -61,7 +62,13 @@ export default function DashboardPage() {
                 description="Monitoreo en tiempo real de la estructura y rendimiento."
             >
                 <button
-                    onClick={() => refreshVoters()}
+                    onClick={() => {
+                        toast.promise(refreshVoters(), {
+                            loading: 'Sincronizando datos...',
+                            success: 'Datos actualizados',
+                            error: 'Error al sincronizar'
+                        });
+                    }}
                     className="btn btn-header-sync"
                 >
                     {isLoading ? 'Sincronizando...' : '🔄 Sincronizar Ahora'}

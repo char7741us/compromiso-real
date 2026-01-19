@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../supabase';
-import { Plus, Upload, Trash2, Edit2, Save, X, Search } from 'lucide-react';
+import { Plus, Upload, Trash2, Edit2, Save, X, Search, Users } from 'lucide-react';
 import AdminHeader from '../../components/AdminHeader';
+import LeaderVotersManager from '../../components/LeaderVotersManager';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 
@@ -18,6 +19,10 @@ export default function LeadersPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+
+    // Manager State
+    const [managingLeader, setManagingLeader] = useState<Leader | null>(null);
+    const [isManagerOpen, setIsManagerOpen] = useState(false);
 
     // Form State
     const [formData, setFormData] = useState({ full_name: '', phone: '', email: '' });
@@ -132,7 +137,7 @@ export default function LeadersPage() {
     };
 
     const filteredLeaders = leaders.filter(l =>
-        l.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+        (l.full_name || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     return (
@@ -187,6 +192,17 @@ export default function LeadersPage() {
                                 </div>
                                 <div className="flex gap-1">
                                     <button
+                                        className="p-1 hover:bg-slate-800 rounded text-amber-400"
+                                        onClick={() => {
+                                            setManagingLeader(leader);
+                                            setIsManagerOpen(true);
+                                        }}
+                                        title="Gestionar Estructura"
+                                        aria-label={`Gestionar votantes de ${leader.full_name}`}
+                                    >
+                                        <Users size={16} />
+                                    </button>
+                                    <button
                                         className="p-1 hover:bg-slate-800 rounded text-blue-400"
                                         onClick={() => {
                                             setFormData({
@@ -219,7 +235,22 @@ export default function LeadersPage() {
                         </div>
                     ))}
                 </div>
-            )}            {isModalOpen && (
+            )}
+
+            {managingLeader && (
+                <LeaderVotersManager
+                    leaderId={managingLeader.id}
+                    leaderName={managingLeader.full_name}
+                    isOpen={isManagerOpen}
+                    onClose={() => {
+                        setIsManagerOpen(false);
+                        setManagingLeader(null);
+                        fetchLeaders();
+                    }}
+                />
+            )}
+
+            {isModalOpen && (
                 <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
                     <div className="bg-slate-900 border border-slate-700 p-6 rounded-xl w-full max-w-md">
                         <div className="flex justify-between mb-4">
