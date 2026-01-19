@@ -337,16 +337,24 @@ if st.session_state.df_main is not None:
         from folium.plugins import MarkerCluster
         marker_cluster = MarkerCluster().add_to(m)
         
-        for idx, row in df_map.iterrows():
+        # Extracción de columnas para iteración rápida (zip es mucho más rápido que iterrows)
+        col_nombres = df_map['NOMBRES']
+        col_apellidos = df_map['APELLIDOS']
+        col_lider = df_map['LÍDER']
+        col_puesto = df_map['PUESTO DE VOTACIÓN']
+        col_lat = df_map['LATITUD']
+        col_long = df_map['LONGITUD']
+
+        for nom, ape, lid, puesto, lat, lon in zip(col_nombres, col_apellidos, col_lider, col_puesto, col_lat, col_long):
             # Tooltip con info
-            tooltip_text = f"<b>{row['NOMBRES']} {row['APELLIDOS']}</b><br>Líder: {row['LÍDER']}<br>Puesto: {row['PUESTO DE VOTACIÓN']}"
+            tooltip_text = f"<b>{nom} {ape}</b><br>Líder: {lid}<br>Puesto: {puesto}"
             
             # Color según estado (Verde: Completo, Rojo: Falta puesto)
-            color = "red" if pd.isna(row['PUESTO DE VOTACIÓN']) or row['PUESTO DE VOTACIÓN'] == '' else "blue"
+            color = "red" if pd.isna(puesto) or puesto == '' else "blue"
             icon = "info-sign" if color == "blue" else "exclamation-sign"
             
             folium.Marker(
-                location=[row['LATITUD'], row['LONGITUD']],
+                location=[lat, lon],
                 popup=tooltip_text,
                 icon=folium.Icon(color=color, icon=icon)
             ).add_to(marker_cluster)
