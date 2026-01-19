@@ -49,7 +49,7 @@ export default function ConsolidatedViewPage() {
             if (selectedLeader !== 'Todos') {
                 // Single Leader Report
                 if (type === 'pdf') {
-                    const doc = generateLeaderPDF(selectedLeader, filteredData);
+                    const doc = await generateLeaderPDF(selectedLeader, filteredData);
                     doc.save(`Reporte_${selectedLeader.replace(/ /g, '_')}.pdf`);
                 } else {
                     const buffer = generateLeaderExcel(selectedLeader, filteredData);

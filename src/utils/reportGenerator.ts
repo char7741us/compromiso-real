@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 import type { VoterData } from '../context/VoterContext';
+import LogoReport from '../assets/logo-report.png';
 
 interface LeaderStats {
     total: number;
@@ -10,6 +11,27 @@ interface LeaderStats {
     missingInfo: number;
     invalidId: number;
 }
+
+const getImageData = (url: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        img.src = url;
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                reject(new Error('Could not get canvas context'));
+                return;
+            }
+            ctx.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL('image/png'));
+        };
+        img.onerror = (error) => reject(error);
+    });
+};
 
 export const calculateLeaderStats = (voters: VoterData[]): LeaderStats => {
     let total = voters.length;
@@ -48,30 +70,38 @@ const getVoterStatus = (voter: VoterData): string => {
 };
 
 // --- PDF GENERATOR ---
-export const generateLeaderPDF = (leaderName: string, voters: VoterData[]): jsPDF => {
+export const generateLeaderPDF = async (leaderName: string, voters: VoterData[]): Promise<jsPDF> => {
     const doc = new jsPDF();
     const stats = calculateLeaderStats(voters);
     const date = new Date().toLocaleDateString('es-CO');
 
-    // Header
+    try {
+        const logoData = await getImageData(LogoReport);
+        // Add Logo: x, y, width, height (Adjusted for logo aspect ratio)
+        doc.addImage(logoData, 'PNG', 14, 10, 50, 25);
+    } catch (error) {
+        console.error("Error loading logo for PDF:", error);
+    }
+
+    // Header Text (Shifted down below logo)
     doc.setFontSize(18);
     doc.setTextColor(41, 128, 185); // Primary Blue
-    doc.text(`Reporte de Equipo: ${leaderName}`, 14, 20);
+    doc.text(`Reporte de Equipo: ${leaderName}`, 14, 45); // Y moved down
 
     doc.setFontSize(10);
     doc.setTextColor(100);
-    doc.text(`Fecha de Corte: ${date}`, 14, 28);
+    doc.text(`Fecha de Corte: ${date}`, 14, 55); // Y moved down
 
-    // Stats Card (Simple representation)
+    // Stats Card
     doc.setFillColor(240, 242, 246);
-    doc.rect(14, 35, 180, 25, 'F');
+    doc.rect(14, 65, 180, 25, 'F'); // Y moved down
 
     doc.setFontSize(12);
     doc.setTextColor(0);
-    doc.text(`Total Votantes: ${stats.total}`, 20, 48);
-    doc.text(`Datos Completos: ${stats.complete} (${((stats.complete / stats.total) * 100).toFixed(0)}%)`, 70, 48);
+    doc.text(`Total Votantes: ${stats.total}`, 20, 80); // Relative to rect
+    doc.text(`Datos Completos: ${stats.complete} (${((stats.complete / stats.total) * 100).toFixed(0)}%)`, 70, 80);
     doc.setTextColor(200, 0, 0); // Red for warning
-    doc.text(`Datos Faltantes: ${stats.missingInfo}`, 140, 48);
+    doc.text(`Datos Faltantes: ${stats.missingInfo}`, 140, 80);
 
     // Table
     const tableBody = voters.map(v => [
@@ -84,7 +114,7 @@ export const generateLeaderPDF = (leaderName: string, voters: VoterData[]): jsPD
     ]);
 
     autoTable(doc, {
-        startY: 65,
+        startY: 100, // Shifted down
         head: [['Nombre Completo', 'Cédula', 'Teléfono', 'Puesto de Votación', 'Mesa', 'Estado']],
         body: tableBody,
         theme: 'grid',
@@ -155,18 +185,20 @@ export const generateAllReportsZip = async (
 
     if (!folder) throw new Error("Could not create ZIP folder");
 
-    Object.entries(groupedVoters).forEach(([leaderName, voters]) => {
+    const entries = Object.entries(groupedVoters);
+
+    for (const [leaderName, voters] of entries) {
         const safeName = leaderName.replace(/[^a-z0-9]/gi, '_').substring(0, 30);
 
         if (format === 'pdf') {
-            const doc = generateLeaderPDF(leaderName, voters);
+            const doc = await generateLeaderPDF(leaderName, voters);
             const pdfBlob = doc.output('blob');
             folder.file(`${safeName}_Reporte.pdf`, pdfBlob);
         } else {
             const excelBuffer = generateLeaderExcel(leaderName, voters);
             folder.file(`${safeName}_Reporte.xlsx`, excelBuffer);
         }
-    });
+    }
 
     return await zip.generateAsync({ type: 'blob' });
 };
