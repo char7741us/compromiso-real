@@ -328,7 +328,12 @@ if st.session_state.df_main is not None:
         st.markdown("Visualización de concentración de votantes (Azul) y Puestos de Votación (Rojo).")
         
         # Simular coordenadas (en producción usar geocoding real)
-        df_map = simulate_geocoding(df.copy())
+        # Optimización: Generar coordenadas una sola vez y persistir en session_state
+        if 'LATITUD' not in df.columns:
+            df = simulate_geocoding(df)
+            st.session_state.df_main = df
+
+        df_map = df.copy()
         
         # Crear mapa centrado en Barranquilla
         m = folium.Map(location=[10.9685, -74.7813], zoom_start=12)
