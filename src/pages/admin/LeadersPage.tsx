@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../supabase';
-import { Plus, Upload, Trash2, Edit2, Save, X, Search } from 'lucide-react';
+import { Plus, Upload, Trash2, Edit2, Save, X, Search, UserPlus } from 'lucide-react';
 import AdminHeader from '../../components/AdminHeader';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
+import VoterFormModal from '../../components/VoterFormModal';
 
 interface Leader {
     id: string;
@@ -16,12 +17,16 @@ interface Leader {
 export default function LeadersPage() {
     const [leaders, setLeaders] = useState<Leader[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isLeaderModalOpen, setIsLeaderModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
-    // Form State
+    // Form State for Leader
     const [formData, setFormData] = useState({ full_name: '', phone: '', email: '' });
     const [isEditing, setIsEditing] = useState<string | null>(null);
+
+    // Voter Modal State
+    const [isVoterModalOpen, setIsVoterModalOpen] = useState(false);
+    const [selectedLeaderId, setSelectedLeaderId] = useState<string | null>(null);
 
     const fetchLeaders = async () => {
         setIsLoading(true);
@@ -36,7 +41,6 @@ export default function LeadersPage() {
         if (error) {
             toast.error('Error cargando líderes');
         } else {
-            console.log(data);
             // Transform data to handle count array
             const formatted = data.map((l: any) => ({
                 ...l,
@@ -68,7 +72,7 @@ export default function LeadersPage() {
                 if (error) throw error;
                 toast.success('Líder creado');
             }
-            setIsModalOpen(false);
+            setIsLeaderModalOpen(false);
             setFormData({ full_name: '', phone: '', email: '' });
             setIsEditing(null);
             fetchLeaders();
@@ -150,7 +154,7 @@ export default function LeadersPage() {
                         <button className="btn btn-primary" onClick={() => {
                             setFormData({ full_name: '', phone: '', email: '' });
                             setIsEditing(null);
-                            setIsModalOpen(true);
+                            setIsLeaderModalOpen(true);
                         }}>
                             <Plus size={18} />
                             Nuevo Líder
@@ -195,7 +199,7 @@ export default function LeadersPage() {
                                                 email: leader.email || ''
                                             });
                                             setIsEditing(leader.id);
-                                            setIsModalOpen(true);
+                                            setIsLeaderModalOpen(true);
                                         }}
                                         title="Editar líder"
                                         aria-label={`Editar líder ${leader.full_name}`}
@@ -216,15 +220,28 @@ export default function LeadersPage() {
                                 {leader.phone && <div>📞 {leader.phone}</div>}
                                 {leader.email && <div>✉️ {leader.email}</div>}
                             </div>
+
+                            <button
+                                className="w-full mt-2 py-2 rounded border border-dashed border-slate-600 hover:border-blue-500 hover:text-blue-400 text-sm flex items-center justify-center gap-2 transition-colors"
+                                onClick={() => {
+                                    setSelectedLeaderId(leader.id);
+                                    setIsVoterModalOpen(true);
+                                }}
+                            >
+                                <UserPlus size={16} />
+                                Agregar Votante
+                            </button>
                         </div>
                     ))}
                 </div>
-            )}            {isModalOpen && (
+            )}
+
+            {isLeaderModalOpen && (
                 <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
                     <div className="bg-slate-900 border border-slate-700 p-6 rounded-xl w-full max-w-md">
                         <div className="flex justify-between mb-4">
                             <h2 className="text-xl font-bold">{isEditing ? 'Editar Líder' : 'Nuevo Líder'}</h2>
-                            <button onClick={() => setIsModalOpen(false)}><X /></button>
+                            <button onClick={() => setIsLeaderModalOpen(false)}><X /></button>
                         </div>
                         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                             <div>
@@ -260,6 +277,18 @@ export default function LeadersPage() {
                     </div>
                 </div>
             )}
+
+            <VoterFormModal
+                isOpen={isVoterModalOpen}
+                onClose={() => {
+                    setIsVoterModalOpen(false);
+                    setSelectedLeaderId(null);
+                }}
+                preSelectedLeaderId={selectedLeaderId || undefined}
+                onSuccess={() => {
+                    fetchLeaders(); // Refresh stats
+                }}
+            />
         </div>
     );
 }
