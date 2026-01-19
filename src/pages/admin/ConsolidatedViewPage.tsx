@@ -1,14 +1,16 @@
 import { useState, useMemo } from 'react';
-import { useVoters } from '../../context/VoterContext';
-import { Search, Filter, Download } from 'lucide-react';
+import { useVoters, type VoterData } from '../../context/VoterContext';
+import { Search, Filter, FileText, FileSpreadsheet, Loader2 } from 'lucide-react';
 import AdminHeader from '../../components/AdminHeader';
 import SkeletonLoader from '../../components/SkeletonLoader';
 import toast from 'react-hot-toast';
+import { generateLeaderPDF, generateLeaderExcel, generateAllReportsZip } from '../../utils/reportGenerator';
 
 export default function ConsolidatedViewPage() {
     const { voters, isLoading } = useVoters();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedLeader, setSelectedLeader] = useState('Todos');
+    const [isGenerating, setIsGenerating] = useState(false);
 
     const filteredData = useMemo(() => {
         return voters.filter(voter => {
@@ -24,43 +26,55 @@ export default function ConsolidatedViewPage() {
     const leaders = useMemo(() => {
         const uniqueLeaders = new Set<string>();
         voters.forEach(v => {
-            // Use the explicit leader_name property we added to context
             const name = v.leader_name || v['LÍDER'] || 'Sin Asignar';
             uniqueLeaders.add(name);
         });
         return Array.from(uniqueLeaders);
     }, [voters]);
 
-    const handleExportCSV = () => {
-        if (filteredData.length === 0) return;
+    // Group voters by leader for bulk export
+    const votersByLeader = useMemo(() => {
+        const groups: Record<string, VoterData[]> = {};
+        leaders.forEach(leader => {
+            groups[leader] = voters.filter(v => (v.leader_name || v['LÍDER'] || 'Sin Asignar') === leader);
+        });
+        return groups;
+    }, [voters, leaders]);
 
-        const headers = ["Líder", "Nombres", "Apellidos", "Cédula", "Teléfono", "Dirección", "Barrio", "Puesto", "Mesa"];
-        const csvContent = [
-            headers.join(','),
-            ...filteredData.map(v => [
-                v.leader_name,
-                v.first_name,
-                v.last_name,
-                v.document_number,
-                v.phone || '',
-                v.address || '',
-                v.neighborhood || '',
-                v.voting_post || '',
-                v.voting_table || ''
-            ].map(val => `"${val}"`).join(','))
-        ].join('\n');
+    const handleDownloadReport = async (type: 'pdf' | 'excel') => {
+        setIsGenerating(true);
+        const toastId = toast.loading('Generando reporte...');
 
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        const url = URL.createObjectURL(blob);
-        link.setAttribute("href", url);
-        link.setAttribute("download", `consolidado_votantes_${new Date().toISOString().split('T')[0]}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        toast.success('¡Exportación exitosa!');
+        try {
+            if (selectedLeader !== 'Todos') {
+                // Single Leader Report
+                if (type === 'pdf') {
+                    const doc = generateLeaderPDF(selectedLeader, filteredData);
+                    doc.save(`Reporte_${selectedLeader.replace(/ /g, '_')}.pdf`);
+                } else {
+                    const buffer = generateLeaderExcel(selectedLeader, filteredData);
+                    const blob = new Blob([buffer as any], { type: 'application/octet-stream' });
+                    const link = document.createElement("a");
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `Reporte_${selectedLeader.replace(/ /g, '_')}.xlsx`;
+                    link.click();
+                }
+                toast.success('Reporte descargado', { id: toastId });
+            } else {
+                // Bulk ZIP Export
+                const zipBlob = await generateAllReportsZip(votersByLeader, type === 'pdf' ? 'pdf' : 'xlsx');
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(zipBlob);
+                link.download = `Reportes_Lideres_${type.toUpperCase()}_${new Date().toISOString().split('T')[0]}.zip`;
+                link.click();
+                toast.success('Archivo ZIP descargado con todos los reportes', { id: toastId });
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error('Error al generar el reporte', { id: toastId });
+        } finally {
+            setIsGenerating(false);
+        }
     };
 
     if (isLoading && voters.length === 0) {
@@ -78,24 +92,42 @@ export default function ConsolidatedViewPage() {
                 title="Consolidado General"
                 description="Vista unificada de todos los votantes registrados y sus líderes."
                 actions={
-                    <button className="btn btn-primary" onClick={handleExportCSV} disabled={filteredData.length === 0}>
-                        <Download size={20} />
-                        Exportar CSV
-                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            className="btn btn-secondary flex items-center gap-2"
+                            onClick={() => handleDownloadReport('pdf')}
+                            disabled={isGenerating || filteredData.length === 0}
+                            title={selectedLeader === 'Todos' ? "Descargar Todos (ZIP)" : "Descargar PDF"}
+                        >
+                            {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <FileText size={18} />}
+                            {selectedLeader === 'Todos' ? 'ZIP PDFs' : 'PDF'}
+                        </button>
+                        <button
+                            className="btn btn-success flex items-center gap-2"
+                            onClick={() => handleDownloadReport('excel')}
+                            disabled={isGenerating || filteredData.length === 0}
+                            title={selectedLeader === 'Todos' ? "Descargar Todos (ZIP)" : "Descargar Excel"}
+                            style={{ backgroundColor: '#217346', color: 'white', border: 'none' }}
+                        >
+                            {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <FileSpreadsheet size={18} />}
+                            {selectedLeader === 'Todos' ? 'ZIP Excel' : 'Excel'}
+                        </button>
+                    </div>
                 }
             />
 
             <div className="card mb-2">
-                <div className="flex-wrap items-end">
+                <div className="flex-wrap items-end" style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
                     <div className="flex-1 min-w-300">
                         <label className="section-title block mb-1 text-sm">
                             Buscar Votante
                         </label>
                         <div className="relative">
-                            <Search size={20} className="search-icon-absolute" />
+                            <Search size={20} className="search-icon-absolute" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#888' }} />
                             <input
                                 type="text"
                                 className="search-input pl-11"
+                                style={{ paddingLeft: '2.5rem', width: '100%', padding: '0.5rem 0.5rem 0.5rem 2.5rem', borderRadius: '6px', border: '1px solid #ddd' }}
                                 placeholder="Nombre o cédula..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -103,19 +135,20 @@ export default function ConsolidatedViewPage() {
                         </div>
                     </div>
 
-                    <div className="w-250">
+                    <div className="w-250" style={{ minWidth: '250px' }}>
                         <label className="section-title block mb-1 text-sm">
                             Filtrar por Líder
                         </label>
                         <div className="relative">
-                            <Filter size={20} className="search-icon-absolute text-muted" />
+                            <Filter size={20} className="search-icon-absolute text-muted" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#888' }} />
                             <select
                                 className="search-input pl-11"
+                                style={{ paddingLeft: '2.5rem', width: '100%', padding: '0.5rem 0.5rem 0.5rem 2.5rem', borderRadius: '6px', border: '1px solid #ddd' }}
                                 value={selectedLeader}
                                 onChange={(e) => setSelectedLeader(e.target.value)}
                                 title="Filtrar por Líder"
                             >
-                                <option value="Todos">Todos los líderes</option>
+                                <option value="Todos">Todos los líderes (Descarga ZIP)</option>
                                 {leaders.sort().map(leader => (
                                     <option key={leader} value={leader}>{leader}</option>
                                 ))}
