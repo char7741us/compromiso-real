@@ -6,18 +6,6 @@ import { useVoters } from '../../context/VoterContext';
 import AdminHeader from '../../components/AdminHeader';
 import SkeletonLoader from '../../components/SkeletonLoader';
 
-// Fix for default marker icons in Leaflet + React
-import icon from 'leaflet/dist/images/marker-icon.png';
-import iconShadow from 'leaflet/dist/images/marker-shadow.png';
-
-let DefaultIcon = L.icon({
-    iconUrl: icon,
-    shadowUrl: iconShadow,
-    iconSize: [25, 41],
-    iconAnchor: [12, 41]
-});
-
-L.Marker.prototype.options.icon = DefaultIcon;
 
 // Municipalities Coordinates (Approximated for Atlántico, Colombia)
 const MUNICIPALITY_COORDS: { [key: string]: [number, number] } = {
