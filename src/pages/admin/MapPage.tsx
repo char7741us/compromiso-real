@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useVoters } from '../../context/VoterContext';
 import AdminHeader from '../../components/AdminHeader';
 import SkeletonLoader from '../../components/SkeletonLoader';
+import { supabase } from '../../supabase';
 
 // Fix for default marker icons in Leaflet + React
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -34,6 +35,12 @@ const MUNICIPALITY_COORDS: { [key: string]: [number, number] } = {
     'SABANAGRANDE': [10.7958, -74.7497]
 };
 
+interface MarkerData {
+    municipality: string;
+    count: number;
+    coords: [number, number] | null;
+}
+
 function ChangeView({ center, zoom }: { center: [number, number], zoom: number }) {
     const map = useMap();
     map.setView(center, zoom);
@@ -41,29 +48,48 @@ function ChangeView({ center, zoom }: { center: [number, number], zoom: number }
 }
 
 export default function MapPage() {
-    const { voters, isLoading } = useVoters();
+    const { isLoading: contextLoading } = useVoters();
+    const [markers, setMarkers] = useState<MarkerData[]>([]);
+    const [loading, setLoading] = useState(true);
     const [mapCenter, setMapCenter] = useState<[number, number]>([10.85, -74.85]);
     const [zoom, setZoom] = useState(10);
     const CENTER: [number, number] = [10.85, -74.85];
 
-    const markers = useMemo(() => {
-        const counts: { [key: string]: { count: number, municipality: string, coords: [number, number] | null } } = {};
-        voters.forEach(v => {
-            const mun = (v['MUNICIPIO RESIDENCIA'] || v['MUNICIPIO VOTACIÓN'] || 'DESCONOCIDO').toUpperCase().trim();
-            if (!counts[mun]) {
-                counts[mun] = { count: 0, municipality: mun, coords: MUNICIPALITY_COORDS[mun] || null };
+    useEffect(() => {
+        const fetchCounts = async () => {
+            setLoading(true);
+            const promises = Object.keys(MUNICIPALITY_COORDS).map(async (mun) => {
+                const { count } = await supabase
+                    .from('voters')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('municipality', mun);
+
+                return {
+                    municipality: mun,
+                    count: count || 0,
+                    coords: MUNICIPALITY_COORDS[mun]
+                };
+            });
+
+            try {
+                const results = await Promise.all(promises);
+                setMarkers(results.sort((a, b) => b.count - a.count));
+            } catch (error) {
+                console.error("Error fetching map data:", error);
+            } finally {
+                setLoading(false);
             }
-            counts[mun].count++;
-        });
-        return Object.values(counts).sort((a, b) => b.count - a.count);
-    }, [voters]);
+        };
+
+        fetchCounts();
+    }, []);
 
     const handleMunicipalityClick = (_municipality: string, coords: [number, number]) => {
         setMapCenter(coords);
         setZoom(13);
     };
 
-    if (isLoading && voters.length === 0) {
+    if (loading) {
         return (
             <div className="container-padding">
                 <SkeletonLoader type="text" count={2} />
@@ -76,7 +102,7 @@ export default function MapPage() {
         <div className="map-page">
             <AdminHeader
                 title="Mapa Territorial"
-                description="Visualización de la densidad electoral por municipio en el Atlántico."
+                description="Visualización de la densidad electoral por municipio (Residencia) en el Atlántico."
             />
 
             <div className="grid-charts grid-map">
@@ -88,11 +114,11 @@ export default function MapPage() {
                         />
                         <ChangeView center={mapCenter} zoom={zoom} />
                         {markers.map((marker, idx) => (
-                            marker.coords && (
+                            marker.coords && marker.count > 0 && (
                                 <CircleMarker
                                     key={idx}
                                     center={marker.coords}
-                                    radius={Math.min(25, 8 + (marker.count / 10))}
+                                    radius={Math.min(30, 10 + (marker.count / 100))}
                                     fillColor="#2563eb"
                                     color="#1e40af"
                                     weight={1}

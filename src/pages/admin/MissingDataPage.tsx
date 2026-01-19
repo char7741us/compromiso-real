@@ -1,30 +1,37 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useVoters, type VoterData } from '../../context/VoterContext';
-import { Search, Save, ExternalLink, Filter, AlertCircle, ChevronDown, FileText } from 'lucide-react';
+import { Search, Save, ExternalLink, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AdminHeader from '../../components/AdminHeader';
 import SkeletonLoader from '../../components/SkeletonLoader';
-import { generateInvalidCCReport } from '../../utils/reportUtils';
 
 export default function MissingDataPage() {
-    const { voters, setVoters, updateVoter, isLoading } = useVoters();
+    const { updateVoter, fetchVoters } = useVoters();
     const [searchParams] = useSearchParams();
+
+    // Server-side state
+    const [voters, setVoters] = useState<VoterData[]>([]);
+    const [totalCount, setTotalCount] = useState(0);
+    const [page, setPage] = useState(1);
+    const [pageSize] = useState(20);
+    const [loading, setLoading] = useState(false);
+
+    // Filters
     const [filter, setFilter] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
-    const [selectedLeader, setSelectedLeader] = useState('all');
-    const [visibleCount, setVisibleCount] = useState(50);
+    const [debouncedSearch, setDebouncedSearch] = useState('');
 
-    // Auto-expand list when filtering by leader to check all
+    // Debounce Search
     useEffect(() => {
-        if (selectedLeader !== 'all') {
-            setVisibleCount(10000);
-        } else {
-            setVisibleCount(50);
-        }
-    }, [selectedLeader]);
+        const handler = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+            setPage(1);
+        }, 500);
+        return () => clearTimeout(handler);
+    }, [searchTerm]);
 
-    // Check for URL params
+    // Apply filters from URL
     useEffect(() => {
         const urlFilter = searchParams.get('filter');
         if (urlFilter === 'invalid_cc') {
@@ -32,38 +39,38 @@ export default function MissingDataPage() {
         }
     }, [searchParams]);
 
-    if (isLoading) {
-        return (
-            <div style={{ padding: '20px' }}>
-                <SkeletonLoader type="text" count={2} />
-                <SkeletonLoader type="table" count={10} />
-            </div>
-        );
-    }
+    // Fetch Logic
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            const filters: any = {};
 
-    // Filter and Search logic
-    const filteredVoters = voters.filter(v => {
-        // Leader Filter
-        if (selectedLeader !== 'all' && v['LÍDER'] !== selectedLeader) return false;
+            if (filter === 'phone') filters['phone'] = null;
+            if (filter === 'address') filters['address'] = null;
+            if (filter === 'voting_post') filters['voting_post'] = null;
+            if (filter === 'invalid_cc') filters['is_invalid_cc'] = true;
 
-        // Custom Data Filters
-        if (filter === 'phone' && v['TELÉFONO']?.trim()) return false;
-        if (filter === 'address' && v['DIRECCIÓN DE RESIDENCIA']?.trim()) return false;
-        if (filter === 'voting_post' && (v['PUESTO DE VOTACIÓN']?.trim() && v['MESA']?.trim())) return false;
-        if (filter === 'invalid_cc' && !v['INVALIDA']) return false;
+            const { data, count } = await fetchVoters({
+                page,
+                pageSize,
+                search: debouncedSearch,
+                filters
+            });
 
-        // Search Bar
-        if (searchTerm) {
-            const searchLower = searchTerm.toLowerCase();
-            const fullName = `${v['NOMBRES'] || ''} ${v['APELLIDOS'] || ''}`.toLowerCase();
-            const cedula = v['No DE CÉDULA SIN PUNTOS']?.toLowerCase() || '';
-            return fullName.includes(searchLower) || cedula.includes(searchLower);
+            setVoters(data);
+            setTotalCount(count);
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setLoading(false);
         }
+    };
 
-        return true;
-    });
+    useEffect(() => {
+        loadData();
+    }, [page, pageSize, debouncedSearch, filter]);
 
-    const activeLeaders = Array.from(new Set(voters.map(v => v['LÍDER']))).filter(Boolean).sort();
+    const totalPages = Math.ceil(totalCount / pageSize);
 
     const handleUpdateById = (id: string, field: string, value: any) => {
         const index = voters.findIndex(v => v._id === id);
@@ -94,6 +101,7 @@ export default function MissingDataPage() {
 
             if (result.success) {
                 toast.success(`Datos de ${voter['NOMBRES']} guardados`);
+                loadData();
             } else {
                 toast.error(`Error: ${result.error}`);
             }
@@ -103,18 +111,11 @@ export default function MissingDataPage() {
         }
     };
 
-    // Pagination logic
-    const handleLoadMore = () => {
-        setVisibleCount(prev => prev + 50);
-    };
-
-    const visibleVoters = filteredVoters.slice(0, visibleCount);
-
     return (
         <div>
             <AdminHeader
                 title="Gestión y Corrección de Datos"
-                description={`Total de registros: ${voters.length}. Gestiona y corrige la información de todos los votantes.`}
+                description={`Total de registros encontrados: ${totalCount}.`}
             >
                 <div className="flex-wrap">
                     <a
@@ -127,23 +128,6 @@ export default function MissingDataPage() {
                         <ExternalLink size={18} />
                         Consultar Registraduría
                     </a>
-                    <button
-                        className="btn"
-                        style={{ backgroundColor: '#dc2626', color: 'white', display: 'flex', alignItems: 'center', gap: '8px' }}
-                        onClick={() => {
-                            console.log('Botón clickeado. Total de votantes:', voters.length);
-                            const result = generateInvalidCCReport(voters);
-                            console.log('Resultado de generación:', result);
-                            if (!result.success) {
-                                toast.error(result.message || 'Error al generar el PDF');
-                            } else {
-                                toast.success('Informe PDF generado correctamente');
-                            }
-                        }}
-                    >
-                        <FileText size={18} />
-                        Descargar Informe de Cédulas Erróneas
-                    </button>
                 </div>
             </AdminHeader>
 
@@ -162,27 +146,12 @@ export default function MissingDataPage() {
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
-
-                        <div style={{ position: 'relative', width: '220px' }}>
-                            <Filter size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                            <select
-                                className="search-input"
-                                style={{ paddingLeft: '40px', appearance: 'none' }}
-                                value={selectedLeader}
-                                onChange={(e) => setSelectedLeader(e.target.value)}
-                            >
-                                <option value="all">Todos los Líderes</option>
-                                {activeLeaders.map((leader: any) => (
-                                    <option key={leader} value={leader}>{leader}</option>
-                                ))}
-                            </select>
-                        </div>
                     </div>
 
                     <div className="flex-wrap" style={{ gap: '10px' }}>
                         <button
                             className={`btn ${filter === 'invalid_cc' ? 'btn-danger' : 'btn-outline-danger'}`}
-                            onClick={() => setFilter(filter === 'invalid_cc' ? 'all' : 'invalid_cc')}
+                            onClick={() => { setFilter(filter === 'invalid_cc' ? 'all' : 'invalid_cc'); setPage(1); }}
                             style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '5px' }}
                         >
                             <AlertCircle size={16} /> CC Inválida
@@ -191,7 +160,7 @@ export default function MissingDataPage() {
                             <button
                                 key={type}
                                 className={`btn ${filter === type ? 'btn-primary' : 'btn-secondary'}`}
-                                onClick={() => setFilter(type)}
+                                onClick={() => { setFilter(type); setPage(1); }}
                                 style={{ fontSize: '0.85rem' }}
                             >
                                 {type === 'all' ? 'Ver Todos' : type === 'phone' ? 'Sin Tel.' : type === 'address' ? 'Sin Dir.' : 'Sin Puesto'}
@@ -204,147 +173,164 @@ export default function MissingDataPage() {
             {/* DATA TABLE */}
             <div className="card">
                 <div className="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Líder / Votante</th>
-                                <th>Residencia y Contacto</th>
-                                <th>Info de Votación (Registraduría)</th>
-                                <th style={{ width: '80px', textAlign: 'center' }}>Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {visibleVoters.map((v) => (
-                                <tr key={v._id} style={{ backgroundColor: v['INVALIDA'] ? '#fff1f2' : '' }}>
-                                    <td>
-                                        <div style={{ fontWeight: '600', color: 'var(--primary)', fontSize: '0.9rem' }}>{v['LÍDER'] || 'Sin Asignar'}</div>
-                                        <div style={{ marginTop: '5px' }}>
-                                            <div style={{ fontWeight: '600', fontSize: '1rem' }}>{v['NOMBRES']} {v['APELLIDOS']}</div>
+                    {loading ? (
+                         <div style={{ padding: '20px' }}>
+                            <SkeletonLoader type="table" count={5} />
+                        </div>
+                    ) : (
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Líder / Votante</th>
+                                    <th>Residencia y Contacto</th>
+                                    <th>Info de Votación (Registraduría)</th>
+                                    <th style={{ width: '80px', textAlign: 'center' }}>Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {voters.map((v) => (
+                                    <tr key={v._id} style={{ backgroundColor: v['INVALIDA'] ? '#fff1f2' : '' }}>
+                                        <td>
+                                            <div style={{ fontWeight: '600', color: 'var(--primary)', fontSize: '0.9rem' }}>{v['LÍDER'] || 'Sin Asignar'}</div>
+                                            <div style={{ marginTop: '5px' }}>
+                                                <div style={{ fontWeight: '600', fontSize: '1rem' }}>{v['NOMBRES']} {v['APELLIDOS']}</div>
 
-                                            {/* CC Correction Area */}
-                                            <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                                {/* CC Correction Area */}
+                                                <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                                    <div style={{ position: 'relative' }}>
+                                                        <span style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>CC.</span>
+                                                        <input
+                                                            type="text"
+                                                            className="search-input"
+                                                            style={{ padding: '4px 8px 4px 28px', fontSize: '0.85rem', width: '100%', fontWeight: '600' }}
+                                                            value={v['No DE CÉDULA SIN PUNTOS'] || ''}
+                                                            onChange={(e) => handleUpdateById(v._id, 'No DE CÉDULA SIN PUNTOS', e.target.value)}
+                                                        />
+                                                    </div>
+                                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', cursor: 'pointer', color: v['INVALIDA'] ? 'var(--danger)' : 'var(--text-muted)' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            style={{ width: '16px', height: '16px' }}
+                                                            checked={v['INVALIDA'] || false}
+                                                            onChange={(e) => handleUpdateById(v._id, 'INVALIDA', e.target.checked)}
+                                                        />
+                                                        <strong>Cédula Inválida</strong>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                 <div style={{ position: 'relative' }}>
-                                                    <span style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>CC.</span>
                                                     <input
                                                         type="text"
+                                                        placeholder="Teléfono"
                                                         className="search-input"
-                                                        style={{ padding: '4px 8px 4px 28px', fontSize: '0.85rem', width: '100%', fontWeight: '600' }}
-                                                        value={v['No DE CÉDULA SIN PUNTOS'] || ''}
-                                                        onChange={(e) => handleUpdateById(v._id, 'No DE CÉDULA SIN PUNTOS', e.target.value)}
+                                                        style={{ padding: '6px 10px', fontSize: '0.8rem', width: '100%' }}
+                                                        value={v['TELÉFONO'] || ''}
+                                                        onChange={(e) => handleUpdateById(v._id, 'TELÉFONO', e.target.value)}
                                                     />
                                                 </div>
-                                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', cursor: 'pointer', color: v['INVALIDA'] ? 'var(--danger)' : 'var(--text-muted)' }}>
+                                                <div style={{ position: 'relative' }}>
                                                     <input
-                                                        type="checkbox"
-                                                        style={{ width: '16px', height: '16px' }}
-                                                        checked={v['INVALIDA'] || false}
-                                                        onChange={(e) => handleUpdateById(v._id, 'INVALIDA', e.target.checked)}
+                                                        type="text"
+                                                        placeholder="Dirección Residencia"
+                                                        className="search-input"
+                                                        style={{ padding: '6px 10px', fontSize: '0.8rem', width: '100%' }}
+                                                        value={v['DIRECCIÓN DE RESIDENCIA'] || ''}
+                                                        onChange={(e) => handleUpdateById(v._id, 'DIRECCIÓN DE RESIDENCIA', e.target.value)}
                                                     />
-                                                    <strong>Cédula Inválida</strong>
-                                                </label>
+                                                </div>
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                            <div style={{ position: 'relative' }}>
-                                                <input
-                                                    type="text"
-                                                    placeholder="Teléfono"
-                                                    className="search-input"
-                                                    style={{ padding: '6px 10px', fontSize: '0.8rem', width: '100%' }}
-                                                    value={v['TELÉFONO'] || ''}
-                                                    onChange={(e) => handleUpdateById(v._id, 'TELÉFONO', e.target.value)}
-                                                />
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px' }}>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Municipio"
+                                                        className="search-input"
+                                                        style={{ padding: '6px', fontSize: '0.8rem' }}
+                                                        value={v['MUNICIPIO VOTACIÓN'] || ''}
+                                                        onChange={(e) => handleUpdateById(v._id, 'MUNICIPIO VOTACIÓN', e.target.value)}
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Puesto de Votación"
+                                                        className="search-input"
+                                                        style={{ padding: '6px', fontSize: '0.8rem' }}
+                                                        value={v['PUESTO DE VOTACIÓN'] || ''}
+                                                        onChange={(e) => handleUpdateById(v._id, 'PUESTO DE VOTACIÓN', e.target.value)}
+                                                    />
+                                                </div>
+                                                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '5px' }}>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Dirección Puesto"
+                                                        className="search-input"
+                                                        style={{ padding: '6px', fontSize: '0.8rem' }}
+                                                        value={v['DIRECCIÓN (Pto de votación)'] || ''}
+                                                        onChange={(e) => handleUpdateById(v._id, 'DIRECCIÓN (Pto de votación)', e.target.value)}
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Mesa"
+                                                        className="search-input"
+                                                        style={{ padding: '6px', fontSize: '0.8rem' }}
+                                                        value={v['MESA'] || ''}
+                                                        onChange={(e) => handleUpdateById(v._id, 'MESA', e.target.value)}
+                                                    />
+                                                </div>
                                             </div>
-                                            <div style={{ position: 'relative' }}>
-                                                <input
-                                                    type="text"
-                                                    placeholder="Dirección Residencia"
-                                                    className="search-input"
-                                                    style={{ padding: '6px 10px', fontSize: '0.8rem', width: '100%' }}
-                                                    value={v['DIRECCIÓN DE RESIDENCIA'] || ''}
-                                                    onChange={(e) => handleUpdateById(v._id, 'DIRECCIÓN DE RESIDENCIA', e.target.value)}
-                                                />
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px' }}>
-                                                <input
-                                                    type="text"
-                                                    placeholder="Municipio"
-                                                    className="search-input"
-                                                    style={{ padding: '6px', fontSize: '0.8rem' }}
-                                                    value={v['MUNICIPIO VOTACIÓN'] || ''}
-                                                    onChange={(e) => handleUpdateById(v._id, 'MUNICIPIO VOTACIÓN', e.target.value)}
-                                                />
-                                                <input
-                                                    type="text"
-                                                    placeholder="Puesto de Votación"
-                                                    className="search-input"
-                                                    style={{ padding: '6px', fontSize: '0.8rem' }}
-                                                    value={v['PUESTO DE VOTACIÓN'] || ''}
-                                                    onChange={(e) => handleUpdateById(v._id, 'PUESTO DE VOTACIÓN', e.target.value)}
-                                                />
-                                            </div>
-                                            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '5px' }}>
-                                                <input
-                                                    type="text"
-                                                    placeholder="Dirección Puesto"
-                                                    className="search-input"
-                                                    style={{ padding: '6px', fontSize: '0.8rem' }}
-                                                    value={v['DIRECCIÓN (Pto de votación)'] || ''}
-                                                    onChange={(e) => handleUpdateById(v._id, 'DIRECCIÓN (Pto de votación)', e.target.value)}
-                                                />
-                                                <input
-                                                    type="text"
-                                                    placeholder="Mesa"
-                                                    className="search-input"
-                                                    style={{ padding: '6px', fontSize: '0.8rem' }}
-                                                    value={v['MESA'] || ''}
-                                                    onChange={(e) => handleUpdateById(v._id, 'MESA', e.target.value)}
-                                                />
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td style={{ verticalAlign: 'middle', textAlign: 'center' }}>
-                                        <button
-                                            className="btn btn-primary"
-                                            style={{ width: '100%', padding: '10px 5px', display: 'flex', justifyContent: 'center' }}
-                                            onClick={() => handleManualSave(v)}
-                                            title="Guardar Cambios"
-                                        >
-                                            <Save size={18} />
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                                        </td>
+                                        <td style={{ verticalAlign: 'middle', textAlign: 'center' }}>
+                                            <button
+                                                className="btn btn-primary"
+                                                style={{ width: '100%', padding: '10px 5px', display: 'flex', justifyContent: 'center' }}
+                                                onClick={() => handleManualSave(v)}
+                                                title="Guardar Cambios"
+                                            >
+                                                <Save size={18} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
                 </div>
 
-                {filteredVoters.length === 0 && !isLoading && (
+                {voters.length === 0 && !loading && (
                     <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
                         No se encontraron registros que coincidan con la búsqueda.
                     </div>
                 )}
 
-                {/* LOAD MORE BUTTON */}
-                {filteredVoters.length > visibleCount && (
-                    <div style={{ textAlign: 'center', padding: '20px', borderTop: '1px solid var(--border-color)' }}>
-                        <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '10px' }}>
-                            Mostrando {visibleCount} de {filteredVoters.length} registros
-                        </p>
-                        <button
-                            className="btn btn-secondary"
-                            onClick={handleLoadMore}
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
-                        >
-                            <ChevronDown size={20} />
-                            Cargar más resultados
-                        </button>
+                {/* PAGINATION CONTROLS */}
+                {totalCount > 0 && (
+                    <div className="flex items-center justify-between mt-4 px-4 py-2">
+                        <div className="text-sm text-gray-500">
+                            Mostrando {((page - 1) * pageSize) + 1} a {Math.min(page * pageSize, totalCount)} de {totalCount} registros
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                className="btn btn-secondary p-2"
+                                onClick={() => setPage(p => Math.max(1, p - 1))}
+                                disabled={page === 1 || loading}
+                            >
+                                <ChevronLeft size={16} />
+                            </button>
+                            <span className="flex items-center px-2">
+                                Página {page} de {totalPages}
+                            </span>
+                            <button
+                                className="btn btn-secondary p-2"
+                                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                disabled={page === totalPages || loading}
+                            >
+                                <ChevronRight size={16} />
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>

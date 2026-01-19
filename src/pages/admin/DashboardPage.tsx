@@ -1,21 +1,28 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useVoters } from '../../context/VoterContext';
 import { Users, UserCheck, FileSpreadsheet, AlertTriangle, TrendingUp, Activity } from 'lucide-react';
 import {
     PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend
+    Legend
 } from 'recharts';
 import InfographicImage from '../../assets/infographic-stats.jpg';
 import AdminHeader from '../../components/AdminHeader';
 import SkeletonLoader from '../../components/SkeletonLoader';
+import { supabase } from '../../supabase';
 
 export default function DashboardPage() {
-    const { stats, voters, isLoading, refreshVoters } = useVoters();
+    const { stats, fetchGlobalStats, isLoading } = useVoters();
+    const [activeLeadersCount, setActiveLeadersCount] = useState(0);
 
-    // Stats for Unique Leaders
-    const uniqueLeaders = useMemo(() => {
-        return new Set(voters.map(v => v['LÍDER']?.trim()).filter(Boolean)).size;
-    }, [voters]);
+    useEffect(() => {
+        fetchGlobalStats();
+        fetchActiveLeaders();
+    }, []);
+
+    const fetchActiveLeaders = async () => {
+        const { count } = await supabase.from('leaders').select('*', { count: 'exact', head: true });
+        if (count !== null) setActiveLeadersCount(count);
+    };
 
     // Data for Pie Chart (Data Quality)
     const dataQuality = useMemo(() => {
@@ -31,20 +38,7 @@ export default function DashboardPage() {
         ];
     }, [stats]);
 
-    // Data for Bar Chart (Top 5 Leaders)
-    const topLeaders = useMemo(() => {
-        const counts: Record<string, number> = {};
-        voters.forEach(v => {
-            const l = v['LÍDER']?.trim() || 'Sin Asignar';
-            counts[l] = (counts[l] || 0) + 1;
-        });
-        return Object.entries(counts)
-            .map(([name, count]) => ({ name, Votantes: count }))
-            .sort((a, b) => b.Votantes - a.Votantes)
-            .slice(0, 5);
-    }, [voters]);
-
-    if (isLoading && voters.length === 0) {
+    if (isLoading && stats.total === 0) {
         return (
             <div className="container-padding">
                 <SkeletonLoader type="text" count={3} />
@@ -61,7 +55,7 @@ export default function DashboardPage() {
                 description="Monitoreo en tiempo real de la estructura y rendimiento."
             >
                 <button
-                    onClick={() => refreshVoters()}
+                    onClick={() => { fetchGlobalStats(); fetchActiveLeaders(); }}
                     className="btn btn-header-sync"
                 >
                     {isLoading ? 'Sincronizando...' : '🔄 Sincronizar Ahora'}
@@ -76,7 +70,7 @@ export default function DashboardPage() {
                     </div>
                     <div>
                         <h3 className="kpi-value">
-                            {isLoading ? <span className="opacity-60">...</span> : stats.total}
+                            {stats.total}
                         </h3>
                         <p className="kpi-label">Votantes Totales</p>
                     </div>
@@ -88,9 +82,9 @@ export default function DashboardPage() {
                     </div>
                     <div>
                         <h3 className="kpi-value">
-                            {isLoading ? <span className="opacity-60">...</span> : uniqueLeaders}
+                            {activeLeadersCount}
                         </h3>
-                        <p className="kpi-label">Líderes Activos</p>
+                        <p className="kpi-label">Líderes Registrados</p>
                     </div>
                 </div>
 
@@ -100,7 +94,7 @@ export default function DashboardPage() {
                     </div>
                     <div>
                         <h3 className="kpi-value">
-                            {isLoading ? <span className="opacity-60">...</span> : stats.missingPhone + stats.missingAddress}
+                            {stats.missingPhone + stats.missingAddress}
                         </h3>
                         <p className="kpi-label">Registros Incompletos</p>
                     </div>
@@ -112,7 +106,7 @@ export default function DashboardPage() {
                     </div>
                     <div>
                         <h3 className="kpi-value">
-                            {isLoading ? <span className="opacity-60">...</span> : stats.invalidIds}
+                            {stats.invalidIds}
                         </h3>
                         <p className="kpi-label">Cédulas Erróneas</p>
                     </div>
@@ -126,18 +120,9 @@ export default function DashboardPage() {
                         <h3 className="m-0">🏆 Top 5 Gestión</h3>
                         <TrendingUp size={20} className="text-muted" />
                     </div>
-                    <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={topLeaders} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
-                            <XAxis type="number" hide />
-                            <YAxis dataKey="name" type="category" width={150} tick={{ fontSize: 12 }} />
-                            <Tooltip
-                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                                cursor={{ fill: 'transparent' }}
-                            />
-                            <Bar dataKey="Votantes" fill="var(--primary)" radius={[0, 4, 4, 0]} barSize={20} />
-                        </BarChart>
-                    </ResponsiveContainer>
+                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '300px', color: '#64748b', textAlign: 'center' }}>
+                       <p>Gráfica desactivada para optimizar rendimiento masivo.<br/>Consulte la sección de análisis.</p>
+                   </div>
                 </div>
 
                 <div className="card h-400">
