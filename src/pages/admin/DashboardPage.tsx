@@ -11,6 +11,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { appConfig } from '../../config/appConfig';
 import toast from 'react-hot-toast';
+import DuplicateVotersModal from '../../components/DuplicateVotersModal';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
@@ -18,6 +19,7 @@ export default function DashboardPage() {
     const { stats, voters, isLoading, refreshVoters } = useVoters();
     const dashboardRef = useRef<HTMLDivElement>(null);
     const [isExporting, setIsExporting] = useState(false);
+    const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
 
     // --- ANALYTICS DATA ---
 
@@ -77,6 +79,26 @@ export default function DashboardPage() {
             .map(([name, Votantes]) => ({ name, Votantes }))
             .sort((a, b) => b.Votantes - a.Votantes)
             .slice(0, 10);
+    }, [voters]);
+
+    // --- DUPLICATE CALCULATION ---
+    const duplicatesCount = useMemo(() => {
+        const map = new Map<string, number>();
+        voters.forEach(v => {
+            const doc = v['No DE CÉDULA SIN PUNTOS']?.toString().trim();
+            if (doc) {
+                map.set(doc, (map.get(doc) || 0) + 1);
+            }
+        });
+
+        // Count how many records are involved in duplicates
+        let count = 0;
+        map.forEach((qty) => {
+            if (qty > 1) {
+                count += qty;
+            }
+        });
+        return count;
     }, [voters]);
 
 
@@ -169,7 +191,7 @@ export default function DashboardPage() {
                 {/* KPI CARDS */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                     <div className="card p-4 flex items-center gap-4 border-l-4 border-l-blue-600 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="p-3 bg-blue-100 rounded-full text-blue-600">
+                        <div className="p-3 bg-blue-100 rounded-full text-blue-600 flex items-center justify-center flex-shrink-0">
                             <Users size={28} />
                         </div>
                         <div>
@@ -179,7 +201,7 @@ export default function DashboardPage() {
                     </div>
 
                     <div className="card p-4 flex items-center gap-4 border-l-4 border-l-teal-500 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="p-3 bg-teal-100 rounded-full text-teal-600">
+                        <div className="p-3 bg-teal-100 rounded-full text-teal-600 flex items-center justify-center flex-shrink-0">
                             <UserCheck size={28} />
                         </div>
                         <div>
@@ -189,7 +211,7 @@ export default function DashboardPage() {
                     </div>
 
                     <div className="card p-4 flex items-center gap-4 border-l-4 border-l-lime-500 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="p-3 bg-lime-100 rounded-full text-lime-600">
+                        <div className="p-3 bg-lime-100 rounded-full text-lime-600 flex items-center justify-center flex-shrink-0">
                             <Target size={28} />
                         </div>
                         <div>
@@ -201,7 +223,7 @@ export default function DashboardPage() {
                     </div>
 
                     <div className="card p-4 flex items-center gap-4 border-l-4 border-l-red-500 shadow-sm hover:shadow-md transition-shadow cursor-pointer" onClick={() => window.location.href = '/admin/missing-data'}>
-                        <div className="p-3 bg-red-100 rounded-full text-red-600">
+                        <div className="p-3 bg-red-100 rounded-full text-red-600 flex items-center justify-center flex-shrink-0">
                             <AlertTriangle size={28} />
                         </div>
                         <div>
@@ -361,13 +383,23 @@ export default function DashboardPage() {
                         <span className="block text-xs text-red-500 uppercase font-bold">Cédulas Erróneas</span>
                         <span className="text-lg font-bold text-red-700">{stats.invalidIds}</span>
                     </div>
-                    <div className="bg-yellow-50 rounded-lg p-3 text-center border border-yellow-100">
+                    <div
+                        className="bg-yellow-50 rounded-lg p-3 text-center border border-yellow-100 cursor-pointer hover:bg-yellow-100 transition-colors"
+                        onClick={() => setIsDuplicateModalOpen(true)}
+                    >
                         <span className="block text-xs text-yellow-600 uppercase font-bold">Duplicados Potenciales</span>
-                        <span className="text-lg font-bold text-yellow-700">0</span>
+                        <span className="text-lg font-bold text-yellow-700">{duplicatesCount}</span>
                     </div>
                 </div>
 
             </div>
+
+            {/* MODALS */}
+            <DuplicateVotersModal
+                isOpen={isDuplicateModalOpen}
+                onClose={() => setIsDuplicateModalOpen(false)}
+                voters={voters}
+            />
         </div>
     );
 }
