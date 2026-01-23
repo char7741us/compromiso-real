@@ -1,6 +1,5 @@
 import LogoGold from '../assets/logo-gold.png';
 import LogoDarkBg from '../assets/logo-dark-bg.png';
-import LogoSidebar from '../assets/logo-compromiso-sidebar.png';
 import LogoReport from '../assets/logo-report.png';
 
 export const appConfig = {

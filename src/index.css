@@ -5,11 +5,16 @@
 @tailwind utilities;
 
 :root {
-    /* Modern Palette - Deep Blue & Vibrant Accents */
-    --primary: #3b82f6;
-    --primary-dark: #1e40af;
-    --primary-light: #60a5fa;
+    /* Premium Gold Palette */
+    --primary: #eab308;
+    /* Gold 500 */
+    --primary-dark: #ca8a04;
+    /* Gold 600 */
+    --primary-light: #facc15;
+    /* Gold 400 */
     --secondary: #64748b;
+    --accent: #0f172a;
+    /* Slate 900 - Deep contrast */
     --background: #f8fafc;
     --surface: #ffffff;
     --surface-glass: rgba(255, 255, 255, 0.7);
@@ -25,6 +30,7 @@
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     --shadow-card: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
     --shadow-hover: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --shadow-gold: 0 4px 14px -3px rgba(234, 179, 8, 0.4);
 
     --glass-border: 1px solid rgba(255, 255, 255, 0.5);
     --glass-backdrop: blur(12px);
@@ -58,6 +64,7 @@ body {
     overflow: hidden;
     background: rgba(255, 255, 255, 0.85);
     /* Global overlay */
+    -webkit-backdrop-filter: blur(20px);
     backdrop-filter: blur(20px);
 }
 
@@ -88,22 +95,24 @@ body {
     padding: 12px 16px;
     margin-bottom: 8px;
     border-radius: var(--radius-md);
-    color: var(--text-muted);
+    color: var(--text-main);
     text-decoration: none;
     font-weight: 500;
     transition: all 0.2s ease;
+    background: rgba(255, 255, 255, 0.6);
 }
 
 .nav-item:hover {
-    background: rgba(255, 255, 255, 0.5);
-    color: var(--primary);
+    background: rgba(255, 255, 255, 0.9);
+    color: var(--primary-dark);
     transform: translateX(3px);
 }
 
 .nav-item.active {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-    color: white;
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    color: var(--accent);
+    box-shadow: var(--shadow-gold);
+    font-weight: 600;
 }
 
 /* --- Mobile Header --- */
@@ -194,13 +203,14 @@ body {
 /* --- AdminHeader Component --- */
 .admin-header {
     position: relative;
-    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
     color: white;
     padding: 2.5rem;
     border-radius: var(--radius-lg);
     margin-bottom: 2rem;
     overflow: hidden;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    border-left: 5px solid var(--primary);
 }
 
 .admin-header::after {
@@ -393,13 +403,15 @@ body {
 
 .btn-primary {
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-    color: white;
-    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
+    color: var(--accent);
+    box-shadow: var(--shadow-gold);
+    font-weight: 700;
 }
 
 .btn-primary:hover {
     filter: brightness(1.1);
     transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(234, 179, 8, 0.5);
 }
 
 .btn-secondary {
@@ -594,20 +606,21 @@ td {
 
 .login-button {
     width: 100%;
-    background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
-    color: white;
-    font-weight: 600;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    color: var(--accent);
+    font-weight: 700;
     padding: 0.875rem;
     border-radius: 0.75rem;
     border: none;
     cursor: pointer;
-    transition: transform 0.2s ease, opacity 0.2s ease;
+    transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
     margin-top: 1rem;
+    box-shadow: var(--shadow-gold);
 }
 
 .login-button:hover:not(:disabled) {
     transform: translateY(-2px);
-    opacity: 0.95;
+    box-shadow: 0 8px 25px rgba(234, 179, 8, 0.5);
 }
 
 .login-button:disabled {
@@ -748,7 +761,7 @@ tr:hover td {
     outline: none;
     border-color: var(--primary);
     background: white;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.15);
 }
 
 /* Animations */

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, Upload, Filter, Grid, List as ListIcon } from 'lucide-react';
+import { Search, Plus, Upload, Grid, List as ListIcon } from 'lucide-react';
 import AdminHeader from '../../components/AdminHeader';
 import LeaderCard from '../../components/LeaderCard';
 import LeaderStatsView from '../../components/LeaderStats';
@@ -15,6 +15,7 @@ export default function LeaderManagement() {
     const [isLoading, setIsLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [searchTerm, setSearchTerm] = useState('');
+    const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive'>('all');
 
     // Modals
     const [showLeaderModal, setShowLeaderModal] = useState(false);
@@ -52,11 +53,17 @@ export default function LeaderManagement() {
         };
     }, [leaders]);
 
-    const filteredLeaders = leaders.filter(l =>
-        l.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        l.document_number?.includes(searchTerm) ||
-        l.zone?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredLeaders = leaders
+        .filter(l => {
+            if (activeFilter === 'active') return l.active;
+            if (activeFilter === 'inactive') return !l.active;
+            return true;
+        })
+        .filter(l =>
+            l.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            l.document_number?.includes(searchTerm) ||
+            l.zone?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
 
     const handleCreateLeader = async (data: any) => {
         await leaderService.createLeader(data);
@@ -155,9 +162,17 @@ export default function LeaderManagement() {
                             <ListIcon size={18} />
                         </button>
                     </div>
-                    <button className="btn btn-secondary flex items-center gap-2 text-slate-600 border-slate-200 hover:bg-slate-50">
-                        <Filter size={18} /> Filtros
-                    </button>
+                    <select
+                        value={activeFilter}
+                        onChange={e => setActiveFilter(e.target.value as 'all' | 'active' | 'inactive')}
+                        className="btn btn-secondary flex items-center gap-2 text-slate-600 border-slate-200 hover:bg-slate-50 bg-white cursor-pointer"
+                        title="Filtrar por estado"
+                        aria-label="Filtrar por estado de líder"
+                    >
+                        <option value="all">Todos ({leaders.length})</option>
+                        <option value="active">Activos ({leaders.filter(l => l.active).length})</option>
+                        <option value="inactive">Inactivos ({leaders.filter(l => !l.active).length})</option>
+                    </select>
                 </div>
             </div>
 

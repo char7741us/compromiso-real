@@ -108,6 +108,8 @@ export const generateLeaderPDF = async (leaderName: string, voters: VoterData[])
         `${v.first_name || ''} ${v.last_name || ''}`,
         v.document_number,
         v.phone || '-',
+        v.address || '-',
+        v.municipality || 'Atlántico',
         v.voting_post || 'POR DEFINIR',
         v.voting_table || '-',
         getVoterStatus(v)
@@ -115,14 +117,15 @@ export const generateLeaderPDF = async (leaderName: string, voters: VoterData[])
 
     autoTable(doc, {
         startY: 100, // Shifted down
-        head: [['Nombre Completo', 'Cédula', 'Teléfono', 'Puesto de Votación', 'Mesa', 'Estado']],
+        head: [['Nombre Completo', 'Cédula', 'Teléfono', 'Dirección', 'Mun.', 'Puesto', 'Mesa', 'Estado']],
         body: tableBody,
         theme: 'grid',
-        headStyles: { fillColor: [44, 62, 80], textColor: 255 },
-        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: { fillColor: [44, 62, 80], textColor: 255, fontSize: 8 },
+        styles: { fontSize: 7, cellPadding: 2 },
         columnStyles: {
-            0: { cellWidth: 50 },
-            5: { fontStyle: 'bold', textColor: [200, 0, 0] } // Highlight Status
+            0: { cellWidth: 40 },
+            5: { cellWidth: 35 },
+            7: { fontStyle: 'bold', textColor: [200, 0, 0] } // Highlight Status
         },
         didParseCell: function (data) {
             if (data.section === 'body' && data.column.index === 5) {
@@ -158,6 +161,7 @@ export const generateLeaderExcel = (leaderName: string, voters: VoterData[]): Ui
         "Cédula": v.document_number,
         "Teléfono": v.phone || '',
         "Dirección": v.address || '',
+        "Municipio": v.municipality || '',
         "Barrio": v.neighborhood || '',
         "Puesto Votación": v.voting_post || '',
         "Mesa": v.voting_table || '',

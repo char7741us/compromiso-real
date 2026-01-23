@@ -12,11 +12,16 @@ export default function LeaderCard({ leader, onEdit, onDelete, onManageVoters }:
     const isGoalMet = (leader.goal_progress || 0) >= 100;
 
     return (
-        <div className={`card group relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-yellow-500/10 hover:border-yellow-500/50 bg-white border border-slate-200 ${!leader.active ? 'opacity-70 grayscale' : ''}`}>
+        <div className={`card group relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-yellow-500/10 hover:border-yellow-500/50 bg-white border border-slate-200 ${!leader.active ? 'opacity-80 border-red-200' : ''}`}>
             {!leader.active && (
-                <div className="absolute top-2 right-2 bg-red-500/20 text-red-500 text-xs px-2 py-1 rounded-full border border-red-500/50">
-                    Inactivo
-                </div>
+                <>
+                    {/* Corner badge */}
+                    <div className="absolute top-3 right-3 bg-red-500 text-white text-xs px-3 py-1 rounded-full font-semibold shadow-md z-10">
+                        ⊘ Inactivo
+                    </div>
+                    {/* Diagonal banner */}
+                    <div className="absolute top-0 left-0 w-full h-1 bg-red-500"></div>
+                </>
             )}
 
             <div className="flex flex-col items-center p-4">

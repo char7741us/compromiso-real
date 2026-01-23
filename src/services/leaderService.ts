@@ -41,12 +41,15 @@ export const leaderService = {
         // Upload photo if exists
         let photo_url = '';
         if (formData.photoFile) {
-            const fileName = `${Date.now()}_${formData.photoFile.name}`;
+            const fileName = `${Date.now()}_${formData.photoFile.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
             const { error: uploadError } = await supabase.storage
                 .from('avatars')
                 .upload(fileName, formData.photoFile);
 
-            if (uploadError) throw uploadError;
+            if (uploadError) {
+                console.error('Photo upload failed:', uploadError);
+                throw new Error(`Error subiendo foto: ${uploadError.message}. Verifica que el bucket 'avatars' exista y tenga permisos públicos.`);
+            }
             const { data: publicUrl } = supabase.storage.from('avatars').getPublicUrl(fileName);
             photo_url = publicUrl.publicUrl;
         }
@@ -73,14 +76,16 @@ export const leaderService = {
         delete updates.photoFile; // Handle separately if needed
 
         if (formData.photoFile) {
-            const fileName = `${Date.now()}_${formData.photoFile.name}`;
+            const fileName = `${Date.now()}_${formData.photoFile.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
             const { error: uploadError } = await supabase.storage
                 .from('avatars')
                 .upload(fileName, formData.photoFile);
-            if (!uploadError) {
-                const { data: publicUrl } = supabase.storage.from('avatars').getPublicUrl(fileName);
-                updates.photo_url = publicUrl.publicUrl;
+            if (uploadError) {
+                console.error('Photo upload failed:', uploadError);
+                throw new Error(`Error subiendo foto: ${uploadError.message}. Verifica que el bucket 'avatars' exista.`);
             }
+            const { data: publicUrl } = supabase.storage.from('avatars').getPublicUrl(fileName);
+            updates.photo_url = publicUrl.publicUrl;
         }
 
         const { error } = await supabase.from('leaders').update(updates).eq('id', id);

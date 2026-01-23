@@ -3,7 +3,7 @@ import { useVoters } from '../../context/VoterContext';
 import { Users, UserCheck, FileSpreadsheet, AlertTriangle, TrendingUp, Activity, Download, MapPin, Target } from 'lucide-react';
 import {
     PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend
+    BarChart, Bar, XAxis, YAxis, CartesianGrid
 } from 'recharts';
 import AdminHeader from '../../components/AdminHeader';
 import SkeletonLoader from '../../components/SkeletonLoader';
@@ -232,7 +232,7 @@ export default function DashboardPage() {
                                     cursor={{ fill: '#f8fafc' }}
                                 />
                                 <Bar dataKey="Votantes" fill="#0f172a" radius={[0, 4, 4, 0]} barSize={18}>
-                                    {topLeaders.map((entry, index) => (
+                                    {topLeaders.map((_, index) => (
                                         <Cell key={`cell-${index}`} fill={index < 3 ? '#eab308' : '#334155'} />
                                     ))}
                                 </Bar>
@@ -261,7 +261,7 @@ export default function DashboardPage() {
                                             paddingAngle={2}
                                             dataKey="value"
                                         >
-                                            {zoneStats.map((entry, index) => (
+                                            {zoneStats.map((_, index) => (
                                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                             ))}
                                         </Pie>
@@ -311,14 +311,18 @@ export default function DashboardPage() {
                     </div>
 
                     {/* 4. DATA QUALITY */}
-                    <div className="card p-5 h-[400px]">
+                    <div className="card p-5 h-auto min-h-[350px] md:h-[400px]">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
                                 <Activity size={20} className="text-emerald-500" /> Calidad de Datos
                             </h3>
                             <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded">Total</span>
                         </div>
-                        <ResponsiveContainer width="100%" height={300}>
+                        <div className="text-center mb-2">
+                            <h4 className="text-3xl font-bold text-slate-800">{Math.round((dataQuality[0]?.value / stats.total) * 100) || 0}%</h4>
+                            <p className="text-xs text-slate-500">Datos Completos</p>
+                        </div>
+                        <ResponsiveContainer width="100%" height={200}>
                             <PieChart>
                                 <Pie
                                     data={dataQuality}
@@ -326,22 +330,27 @@ export default function DashboardPage() {
                                     cy="50%"
                                     startAngle={180}
                                     endAngle={0}
-                                    innerRadius={80}
-                                    outerRadius={120}
+                                    innerRadius={60}
+                                    outerRadius={90}
                                     paddingAngle={0}
                                     dataKey="value"
                                 >
-                                    {dataQuality.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                    {dataQuality.map((_, index) => (
+                                        <Cell key={`cell-${index}`} fill={dataQuality[index].color} />
                                     ))}
                                 </Pie>
                                 <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-                                <Legend verticalAlign="bottom" height={36} iconType="circle" />
                             </PieChart>
                         </ResponsiveContainer>
-                        <div className="text-center mt-[-40px]">
-                            <h4 className="text-2xl font-bold text-slate-800">{Math.round((dataQuality[0].value / stats.total) * 100) || 0}%</h4>
-                            <p className="text-xs text-slate-500">Datos Completos</p>
+                        <div className="flex justify-center gap-6 mt-2 text-sm">
+                            <div className="flex items-center gap-2">
+                                <span className="w-3 h-3 rounded-full bg-emerald-500"></span>
+                                <span className="text-slate-600">Datos Completos</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="w-3 h-3 rounded-full bg-amber-500"></span>
+                                <span className="text-slate-600">Por Completar</span>
+                            </div>
                         </div>
                     </div>
 

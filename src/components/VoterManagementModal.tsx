@@ -22,7 +22,11 @@ export default function VoterManagementModal({ leader, onClose }: VoterManagemen
         first_name: '',
         last_name: '',
         document_number: '',
-        phone: ''
+        phone: '',
+        address: '',
+        voting_post: '',
+        voting_table: '',
+        neighborhood: ''
     });
 
     const fetchVoters = async () => {
@@ -45,7 +49,7 @@ export default function VoterManagementModal({ leader, onClose }: VoterManagemen
         try {
             await leaderService.addVoterToLeader(leader.id, newVoter);
             toast.success('Votante agregado');
-            setNewVoter({ first_name: '', last_name: '', document_number: '', phone: '' });
+            setNewVoter({ first_name: '', last_name: '', document_number: '', phone: '', address: '', voting_post: '', voting_table: '', neighborhood: '' });
             setIsAdding(false);
             fetchVoters();
         } catch (error) {
@@ -121,12 +125,22 @@ export default function VoterManagementModal({ leader, onClose }: VoterManagemen
 
                 {/* Manual Add Form - Expandable */}
                 {isAdding && (
-                    <form onSubmit={handleAddVoter} className="p-4 bg-slate-50 border-b border-slate-200 grid grid-cols-1 md:grid-cols-5 gap-3 animate-in slide-in-from-top-2">
-                        <input required placeholder="Nombre" className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-teal-500 text-sm h-10" value={newVoter.first_name} onChange={e => setNewVoter({ ...newVoter, first_name: e.target.value })} title="Nombre" />
-                        <input required placeholder="Apellidos" className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-teal-500 text-sm h-10" value={newVoter.last_name} onChange={e => setNewVoter({ ...newVoter, last_name: e.target.value })} title="Apellidos" />
-                        <input required placeholder="Cédula" className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-teal-500 text-sm h-10" value={newVoter.document_number} onChange={e => setNewVoter({ ...newVoter, document_number: e.target.value })} title="Cédula" />
-                        <input placeholder="Teléfono" className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-teal-500 text-sm h-10" value={newVoter.phone} onChange={e => setNewVoter({ ...newVoter, phone: e.target.value })} title="Teléfono" />
-                        <button type="submit" className="bg-teal-600 hover:bg-teal-500 text-white rounded-lg font-bold">Guardar</button>
+                    <form onSubmit={handleAddVoter} className="p-4 bg-slate-50 border-b border-slate-200 animate-in slide-in-from-top-2">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
+                            <input required placeholder="Nombre *" className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-teal-500 text-sm h-10" value={newVoter.first_name} onChange={e => setNewVoter({ ...newVoter, first_name: e.target.value })} title="Nombre" />
+                            <input required placeholder="Apellidos *" className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-teal-500 text-sm h-10" value={newVoter.last_name} onChange={e => setNewVoter({ ...newVoter, last_name: e.target.value })} title="Apellidos" />
+                            <input required placeholder="Cédula *" className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-teal-500 text-sm h-10" value={newVoter.document_number} onChange={e => setNewVoter({ ...newVoter, document_number: e.target.value })} title="Cédula" />
+                            <input placeholder="Teléfono" className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-teal-500 text-sm h-10" value={newVoter.phone} onChange={e => setNewVoter({ ...newVoter, phone: e.target.value })} title="Teléfono" />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
+                            <input placeholder="Dirección" className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-teal-500 text-sm h-10" value={newVoter.address} onChange={e => setNewVoter({ ...newVoter, address: e.target.value })} title="Dirección" />
+                            <input placeholder="Barrio" className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-teal-500 text-sm h-10" value={newVoter.neighborhood} onChange={e => setNewVoter({ ...newVoter, neighborhood: e.target.value })} title="Barrio" />
+                            <input placeholder="Puesto de Votación" className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-teal-500 text-sm h-10" value={newVoter.voting_post} onChange={e => setNewVoter({ ...newVoter, voting_post: e.target.value })} title="Puesto de Votación" />
+                            <input placeholder="Mesa" className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 outline-none focus:border-teal-500 text-sm h-10" value={newVoter.voting_table} onChange={e => setNewVoter({ ...newVoter, voting_table: e.target.value })} title="Mesa" />
+                        </div>
+                        <div className="flex justify-end">
+                            <button type="submit" className="bg-teal-600 hover:bg-teal-500 text-white rounded-lg font-bold px-6 py-2">Guardar Votante</button>
+                        </div>
                     </form>
                 )}
 
