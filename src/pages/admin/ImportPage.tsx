@@ -146,15 +146,18 @@ export default function ImportPage() {
             const leadersMap = new Map<string, string>();
             const uniqueLeaderNames = Array.from(new Set(data.map(d => d['LÍDER']?.trim()).filter(Boolean)));
 
-            for (const leaderName of uniqueLeaderNames) {
-                const { data: leaderData, error: leaderError } = await supabase
-                    .from('leaders')
-                    .upsert({ full_name: leaderName }, { onConflict: 'full_name' })
-                    .select('id')
-                    .single();
+            const leadersToUpsert = uniqueLeaderNames.map(name => ({ full_name: name }));
+            const { data: upsertedLeaders, error: leadersError } = await supabase
+                .from('leaders')
+                .upsert(leadersToUpsert, { onConflict: 'full_name' })
+                .select('id, full_name');
 
-                if (leaderError) continue;
-                if (leaderData) leadersMap.set(leaderName, leaderData.id);
+            if (leadersError) throw leadersError;
+
+            if (upsertedLeaders) {
+                upsertedLeaders.forEach(leader => {
+                    leadersMap.set(leader.full_name, leader.id);
+                });
             }
 
             setSaveStatus(`Guardando ${data.length} votantes...`);
