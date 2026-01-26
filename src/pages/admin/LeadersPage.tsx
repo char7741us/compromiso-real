@@ -108,20 +108,31 @@ export default function LeadersPage() {
                 const data = XLSX.utils.sheet_to_json(ws);
 
                 // Expected format: Name, Phone, Email
-                let successCount = 0;
-                for (const rowItem of data) {
-                    const row = rowItem as any;
-                    const name = row['Nombre'] || row['nombre'] || row['Name'];
-                    if (name) {
-                        const { error } = await supabase.from('leaders').insert([{
-                            full_name: name,
-                            phone: row['Telefono'] || row['phone'] || '',
-                            email: row['Email'] || row['email'] || ''
-                        }]);
-                        if (!error) successCount++;
+                const newLeaders = data
+                    .map((rowItem: any) => {
+                        const name = rowItem['Nombre'] || rowItem['nombre'] || rowItem['Name'];
+                        if (name) {
+                            return {
+                                full_name: name,
+                                phone: String(rowItem['Telefono'] || rowItem['phone'] || ''),
+                                email: String(rowItem['Email'] || rowItem['email'] || ''),
+                            };
+                        }
+                        return null;
+                    })
+                    .filter(Boolean);
+
+                if (newLeaders.length > 0) {
+                    const { error } = await supabase.from('leaders').insert(newLeaders as any);
+
+                    if (error) {
+                        throw error;
                     }
+                    toast.success(`${newLeaders.length} líderes importados`);
+                } else {
+                    toast.warn('No se encontraron líderes válidos en el archivo.');
                 }
-                toast.success(`${successCount} líderes importados`);
+
                 fetchLeaders();
             } catch (error) {
                 toast.error('Error procesando archivo');
