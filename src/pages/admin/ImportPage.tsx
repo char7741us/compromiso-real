@@ -3,6 +3,7 @@ import Papa from 'papaparse';
 import { Upload, AlertCircle, CheckCircle, FileSpreadsheet, Database } from 'lucide-react';
 import { useVoters, type VoterData } from '../../context/VoterContext';
 import { supabase } from '../../supabase';
+import { batchUpsert } from '../../utils/supabaseHelpers';
 import AdminHeader from '../../components/AdminHeader';
 
 // Exact columns provided by user
@@ -189,11 +190,7 @@ export default function ImportPage() {
             });
             const uniqueVotersPayload = Array.from(uniqueVotersMap.values());
 
-            const { error: votersError } = await supabase
-                .from('voters')
-                .upsert(uniqueVotersPayload, { onConflict: 'document_number' });
-
-            if (votersError) throw votersError;
+            await batchUpsert(supabase, 'voters', uniqueVotersPayload, { onConflict: 'document_number' });
 
             setSaveStatus(null);
             setSuccess(`¡Éxito! Se han guardado ${uniqueVotersPayload.length} registros.`);
