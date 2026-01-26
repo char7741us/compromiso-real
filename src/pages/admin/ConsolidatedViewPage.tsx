@@ -35,11 +35,15 @@ export default function ConsolidatedViewPage() {
     // Group voters by leader for bulk export
     const votersByLeader = useMemo(() => {
         const groups: Record<string, VoterData[]> = {};
-        leaders.forEach(leader => {
-            groups[leader] = voters.filter(v => (v.leader_name || v['LÍDER'] || 'Sin Asignar') === leader);
+        voters.forEach(v => {
+            const leader = v.leader_name || v['LÍDER'] || 'Sin Asignar';
+            if (!groups[leader]) {
+                groups[leader] = [];
+            }
+            groups[leader].push(v);
         });
         return groups;
-    }, [voters, leaders]);
+    }, [voters]);
 
     const handleDownloadReport = async (type: 'pdf' | 'excel') => {
         setIsGenerating(true);
