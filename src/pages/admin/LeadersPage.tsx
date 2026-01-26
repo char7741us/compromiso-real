@@ -108,21 +108,32 @@ export default function LeadersPage() {
                 const data = XLSX.utils.sheet_to_json(ws);
 
                 // Expected format: Name, Phone, Email
-                let successCount = 0;
+                const leadersToInsert = [];
                 for (const rowItem of data) {
                     const row = rowItem as any;
                     const name = row['Nombre'] || row['nombre'] || row['Name'];
                     if (name) {
-                        const { error } = await supabase.from('leaders').insert([{
+                        leadersToInsert.push({
                             full_name: name,
                             phone: row['Telefono'] || row['phone'] || '',
                             email: row['Email'] || row['email'] || ''
-                        }]);
-                        if (!error) successCount++;
+                        });
                     }
                 }
-                toast.success(`${successCount} líderes importados`);
-                fetchLeaders();
+
+                if (leadersToInsert.length > 0) {
+                    const { error } = await supabase.from('leaders').insert(leadersToInsert);
+
+                    if (error) {
+                        console.error(error);
+                        toast.error('Error importando líderes');
+                    } else {
+                        toast.success(`${leadersToInsert.length} líderes importados`);
+                        fetchLeaders();
+                    }
+                } else {
+                    toast.info('No se encontraron datos válidos para importar');
+                }
             } catch (error) {
                 toast.error('Error procesando archivo');
                 console.error(error);
